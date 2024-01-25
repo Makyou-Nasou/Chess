@@ -1,4 +1,4 @@
-(lang dune 3.11)
+(lang dune 4.11.1)
 
 (name Chess)
 
