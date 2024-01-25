@@ -4,25 +4,25 @@ type color = Black | White
 
 type piece = {shape : shape; color : color}
 
-let pp_piece fmt piece color=
+let pp_piece fmt piece=
     let p_str =
-        match piece with
-        | King -> (match color with
+        match piece.shape with
+        | King -> (match piece.color with
           | Black -> "♚"
           | White -> "♔")
-        | Queen -> (match color with
+        | Queen -> (match piece.color with
           | Black -> "♛"
           | White -> "♕")
-        | Rook -> (match color with
+        | Rook -> (match piece.color with
           | Black -> "♜"
           | White -> "♖")
-        | Bishop -> (match color with
+        | Bishop -> (match piece.color with
           | Black -> "♝"
           | White -> "♗")
-        | Horse -> (match color with
+        | Horse -> (match piece.color with
           | Black -> "♞"
           | White -> "♘")
-        | Pawn -> (match color with
+        | Pawn -> (match piece.color with
           | Black -> "♟"
           | White -> "♙")
     in Format.fprintf fmt "%s" p_str
