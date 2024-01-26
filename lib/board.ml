@@ -1,5 +1,4 @@
 open Piece
-open Player
 open Global
 
 type board = piece option list list
@@ -230,12 +229,13 @@ let delete_piece (b : board) ((cl, cc) : coordonne) =
   let new_line = set_element_list (List.nth b cl) cc None in
   set_element_list b cl new_line
 
-let try_passant (b : board) (p : piece) (next_player : player) (m : move) =
+let try_passant (b : board) (p : piece) (next_player_color : color)
+    (next_player_last_move : move option) (m : move) =
   match m with
   | Movement (current_move_coord_start, current_move_coord_final) -> (
       match p.shape with
       | Pawn _ -> (
-          match get_last_move_from_player next_player with
+          match next_player_last_move with
           | Some
               (Movement
                 ( ( previou_move_coord_start_line,
@@ -246,7 +246,7 @@ let try_passant (b : board) (p : piece) (next_player : player) (m : move) =
                   match piece.shape with
                   | Pawn _ ->
                       let coord_to_attack =
-                        if get_color_from_player next_player = Black then
+                        if next_player_color = Black then
                           ( previou_move_coord_start_line + 1,
                             previou_move_coord_start_column )
                         else
@@ -278,7 +278,7 @@ let attacked_coord_by_enemy (b : board) (coord : coordonne) (c : color) =
   in
   aux 0 0
 
-let chess (b : board) (c : color) : bool =
+let chess (b : board) (c : color) : bool option =
   let rec aux line column =
     match get_piece b (line, column) with
     | Some { shape = King _; color } when color = c -> Some (line, column)
@@ -320,85 +320,95 @@ let chess_mate (b : board) (c : color) =
         && attacked_coord_by_enemy b (line + 1, column - 1) c)
   | None -> None
 
-let move (b : board) (current_player : player) (next_player : player) (m : move)
-    =
-  match m with
+let move (b : board) (current_player_color : color) (next_player_color : color)
+    (next_player_last_move : move option) (current_player_move : move) =
+  match current_player_move with
   | Movement (coord_start, coord_final) -> (
       match get_piece b coord_start with
       | None -> None
       | Some piece ->
           if
-            piece.color = get_color_from_player current_player
+            piece.color = current_player_color
             &&
             match get_piece b coord_final with
             | None -> true
             | Some piece_coord_final ->
-                piece_coord_final.color <> get_color_from_player current_player
+                piece_coord_final.color <> current_player_color
           then
             if can_move b piece coord_start coord_final then
               let new_b = move_from_coord_to_coord b coord_start coord_final in
-              if chess new_b (get_color_from_player current_player) then None
+              if
+                let are_chess = chess new_b current_player_color in
+                are_chess = Some true || are_chess = None
+              then None
               else Some new_b
             else
-              let new_b = try_passant b piece next_player m in
+              let new_b =
+                try_passant b piece next_player_color next_player_last_move
+                  current_player_move
+              in
               match new_b with
               | Some new_b ->
-                  if chess new_b (get_color_from_player current_player) then
-                    None
+                  if
+                    let are_chess = chess new_b current_player_color in
+                    are_chess = Some true || are_chess = None
+                  then None
                   else Some new_b
               | None -> None
           else None)
   | Big_Castling -> (
       let coord_king =
-        if get_color_from_player current_player = Black then (0, 4) else (7, 4)
+        if current_player_color = Black then (0, 4) else (7, 4)
       in
       let coord_rook =
-        if get_color_from_player current_player = Black then (0, 0) else (7, 0)
+        if current_player_color = Black then (0, 0) else (7, 0)
       in
       match (get_piece b coord_king, get_piece b coord_king) with
       | Some { shape = King b1; color = _ }, Some { shape = Rook b2; color = _ }
         ->
           if b1 && b2 && empty_straight b coord_king coord_rook then
             let new_coord_king =
-              if get_color_from_player current_player = Black then (0, 2)
-              else (7, 2)
+              if current_player_color = Black then (0, 2) else (7, 2)
             in
             let new_coord_rook =
-              if get_color_from_player current_player = Black then (0, 3)
-              else (7, 3)
+              if current_player_color = Black then (0, 3) else (7, 3)
             in
             let new_b = move_from_coord_to_coord b coord_king new_coord_king in
             let new_b =
               move_from_coord_to_coord new_b coord_rook new_coord_rook
             in
-            if chess new_b (get_color_from_player current_player) then None
+            if
+              let are_chess = chess new_b current_player_color in
+              are_chess = Some true || are_chess = None
+            then None
             else Some new_b
           else None
       | _, _ -> None)
   | Small_Castling -> (
       let coord_king =
-        if get_color_from_player current_player = Black then (0, 4) else (7, 4)
+        if current_player_color = Black then (0, 4) else (7, 4)
       in
       let coord_rook =
-        if get_color_from_player current_player = Black then (0, 7) else (7, 7)
+        if current_player_color = Black then (0, 7) else (7, 7)
       in
       match (get_piece b coord_king, get_piece b coord_king) with
       | Some { shape = King b1; color = _ }, Some { shape = Rook b2; color = _ }
         ->
           if b1 && b2 && empty_straight b coord_king coord_rook then
             let new_coord_king =
-              if get_color_from_player current_player = Black then (0, 6)
-              else (7, 6)
+              if current_player_color = Black then (0, 6) else (7, 6)
             in
             let new_coord_rook =
-              if get_color_from_player current_player = Black then (0, 5)
-              else (7, 5)
+              if current_player_color = Black then (0, 5) else (7, 5)
             in
             let new_b = move_from_coord_to_coord b coord_king new_coord_king in
             let new_b =
               move_from_coord_to_coord new_b coord_rook new_coord_rook
             in
-            if chess new_b (get_color_from_player current_player) then None
+            if
+              let are_chess = chess new_b current_player_color in
+              are_chess = Some true || are_chess = None
+            then None
             else Some new_b
           else None
       | _, _ -> None)

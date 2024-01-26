@@ -6,31 +6,66 @@ type game = { current_player : int; players : player list; board : board }
 
 let pp_game fmt game = pp_board fmt game.board
 
-let init_game () =
+let init_game chose_move_black chose_move_white =
   {
     current_player = 0;
-    players = [ init_player Black; init_player White ];
+    players =
+      [ init_player chose_move_black Black; init_player chose_move_white White ];
     board = init_board ();
   }
+
+let set_next_player_from_game g =
+  { g with current_player = 1 - g.current_player }
 
 let get_current_player_from_game g = List.nth g.players g.current_player
 let get_next_player_from_game g = List.nth g.players (1 - g.current_player)
 
 let move (g : game) (m : move) =
+  let next_player = get_next_player_from_game g in
   match
     Board.move g.board
-      (get_current_player_from_game g)
-      (get_next_player_from_game g)
+      (get_color_from_player (get_current_player_from_game g))
+      (get_color_from_player next_player)
+      (get_last_move_from_player next_player)
       m
   with
   | None -> None
   | Some b -> Some { g with board = b }
 
-exeption No_king
+exception No_King
 
-let end_of_game game = match chess_mate game.board White with 
-|Some b when b -> Some White 
-|Some b when not b -> (match chess_mate game.board Black with
-                            | Some b when b -> Some Black 
-                            | _ -> None)
-|None -> raise No_king
+let end_of_game game =
+  match chess_mate game.board White with
+  | Some true -> Some White
+  | Some false -> (
+      match chess_mate game.board Black with
+      | Some true -> Some Black
+      | Some false -> None
+      | None ->
+          let () =
+            Format.fprintf Format.std_formatter "No king on the board. "
+          in
+          raise No_King)
+  | None ->
+      let () = Format.fprintf Format.std_formatter "No king on the board. " in
+      raise No_King
+
+let start_game chose_move_black chose_move_white =
+  let rec aux game nbr_try =
+    let current_player = get_current_player_from_game game in
+    let mv = (get_choose_move_from_player current_player) game.board in
+    match move game mv with
+    | Some game -> (
+        let new_game = set_next_player_from_game game in
+        match try end_of_game new_game with No_King -> None with
+        | Some t -> Some t
+        | None -> aux new_game 3)
+    | None ->
+        if nbr_try = 0 then
+          let () =
+            Format.fprintf Format.std_formatter "More than 3 mistakes ..."
+          in
+          None
+        else aux game (nbr_try - 1)
+  in
+  aux (init_game chose_move_black chose_move_white) 3
