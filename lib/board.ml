@@ -6,8 +6,8 @@ type board = piece option list list
 
 let get_starter_piece ((line, column) : coordonne) =
   match line with
-  | 1 -> Some { shape = Pawn; color = Black }
-  | 6 -> Some { shape = Pawn; color = White }
+  | 1 -> Some { shape = Pawn true; color = Black }
+  | 6 -> Some { shape = Pawn true; color = White }
   | _ -> (
       let color =
         match line with 0 -> Some Black | 7 -> Some White | _ -> None
@@ -63,7 +63,7 @@ let pp_board fmt board =
 let get_piece (b : board) (c : coordonne) =
   match c with x, y -> List.nth (List.nth b x) y
 
-let set_list list indice new_element =
+let set_element_list list indice new_element =
   let rec aux_set_list list current_indice =
     match list with
     | a :: b ->
@@ -73,6 +73,7 @@ let set_list list indice new_element =
   in
   aux_set_list list 0
 
+(*Exchange the pieces of the two indicated boxes*)
 let switch_coord (b : board) (coord_start : coordonne) (coord_final : coordonne)
     =
   match (coord_start, coord_final) with
@@ -80,17 +81,85 @@ let switch_coord (b : board) (coord_start : coordonne) (coord_final : coordonne)
       (final_line_number, final_column_number) ) ->
       let piece = get_piece b (start_line_number, start_column_number) in
       let start_line = List.nth b start_line_number in
-      let start_line = set_list start_line start_column_number None in
+      let start_line = set_element_list start_line start_column_number None in
       if start_line_number = final_line_number then
         let final_line = start_line in
-        let final_line = set_list final_line final_column_number piece in
-        set_list b final_line_number final_line
+        let final_line =
+          set_element_list final_line final_column_number piece
+        in
+        set_element_list b final_line_number final_line
       else
         let final_line = List.nth b final_line_number in
-        let final_line = set_list final_line final_column_number piece in
-        let b = set_list b final_line_number final_line in
-        set_list b start_line_number start_line
+        let final_line =
+          set_element_list final_line final_column_number piece
+        in
+        let b = set_element_list b final_line_number final_line in
+        set_element_list b start_line_number start_line
 
+(*We don’t check whether the starting box or the arriving box are empty.
+   We just look at whether the intermediate boxes are empty.*)
+let empty_straight (b : board) (coord_start : coordonne)
+    (coord_final : coordonne) =
+  match (coord_start, coord_final) with
+  | ( (coord_start_line, coord_start_column),
+      (coord_final_line, coord_final_column) ) ->
+      if
+        coord_start_line < 0 || coord_start_line > 7 || coord_final_line < 0
+        || coord_final_column > 7
+      then false
+      else
+        let distance_line = coord_start_line - coord_final_line in
+        let distance_column = coord_start_column - coord_final_column in
+        if distance_column <> 0 && distance_line <> 0 then false
+        else
+          let dir_line =
+            if distance_line < 0 then 1 else if distance_line = 0 then 0 else -1
+          in
+          let dir_column =
+            if distance_column < 0 then 1
+            else if distance_column = 0 then 0
+            else -1
+          in
+          let rec aux (coord_current_line, coord_current_line_colum) =
+            if coord_start = coord_final then true
+            else
+              get_piece b (coord_current_line, coord_current_line_colum) = None
+              && aux
+                   ( coord_current_line + dir_line,
+                     coord_current_line_colum + dir_column )
+          in
+          aux (coord_start_line + dir_line, coord_start_column + dir_column)
+
+(*We don’t check whether the starting box or the arriving box are empty.
+   We just look at whether the intermediate boxes are empty.*)
+let empty_diagonal (b : board) (coord_start : coordonne)
+    (coord_final : coordonne) =
+  match (coord_start, coord_final) with
+  | ( (coord_start_line, coord_start_column),
+      (coord_final_line, coord_final_column) ) ->
+      if
+        coord_start_line < 0 || coord_start_line > 7 || coord_final_line < 0
+        || coord_final_column > 7
+      then false
+      else
+        let distance_line = coord_start_line - coord_final_line in
+        let distance_column = coord_start_column - coord_final_column in
+        if distance_column <> distance_line then false
+        else
+          let dir_line = if distance_line < 0 then 1 else -1 in
+          let dir_column = if distance_column < 0 then 1 else -1 in
+          let rec aux (coord_current_line, coord_current_line_colum) =
+            if coord_start = coord_final then true
+            else
+              get_piece b (coord_current_line, coord_current_line_colum) = None
+              && aux
+                   ( coord_current_line + dir_line,
+                     coord_current_line_colum + dir_column )
+          in
+          aux (coord_start_line + dir_line, coord_start_column + dir_column)
+
+(*We assume that the arrival box is empty or occupied by an enemy.
+   That the starting box is occupied by the piece given as an argument.*)
 let can_move (b : board) (p : piece) (coord_start : coordonne)
     (coord_final : coordonne) =
   match (coord_start, coord_final) with
@@ -102,7 +171,37 @@ let can_move (b : board) (p : piece) (coord_start : coordonne)
       | King _ ->
           distance_column = 1 || distance_column = -1 || distance_line = 1
           || distance_line = -1
-      | _ -> true || b = b)
+      | Queen ->
+          (distance_column = distance_line
+          || distance_column = -distance_line
+             && empty_diagonal b coord_start coord_final)
+          || ((distance_column = 0 && distance_line <> 0)
+             || (distance_line = 0 && distance_line <> 0))
+             && empty_straight b coord_start coord_final
+      | Bishop ->
+          distance_column = distance_line
+          || distance_column = -distance_line
+             && empty_diagonal b coord_start coord_final
+      | Rook ->
+          ((distance_column = 0 && distance_line <> 0)
+          || (distance_line = 0 && distance_line <> 0))
+          && empty_straight b coord_start coord_final
+      | Horse ->
+          (distance_line = 2 || distance_line = -2)
+          && (distance_column = 1 || distance_column = -1)
+          || (distance_line = 1 || distance_line = -1)
+             && (distance_column = 2 || distance_column = -2)
+      | Pawn first_move ->
+          (distance_line = 0
+           && ((dir_column = 2 && p.color = White)
+              || (dir_column = -2 && p.color = Black))
+           && first_move
+          || (dir_column = 1 && p.color = White)
+          || (dir_column = -1 && p.color = Black))
+          || (distance_line = 1 || distance_line = -1)
+             && ((dir_column = 1 && p.color = White)
+                || (dir_column = -1 && p.color = Black))
+             && get_piece coord_final <> None)
 
 let move (b : board) (p : player) (m : move) =
   match m with
@@ -115,7 +214,8 @@ let move (b : board) (p : player) (m : move) =
             &&
             match get_piece b coord_final with
             | None -> true
-            | Some piece_coord_final -> piece_coord_final.color <> get_color_from_player p
+            | Some piece_coord_final ->
+                piece_coord_final.color <> get_color_from_player p
           then
             if can_move b piece coord_start coord_final then
               Some (switch_coord b coord_start coord_final)
