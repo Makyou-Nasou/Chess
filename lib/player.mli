@@ -1,4 +1,3 @@
-open Piece
 open Global
 
 type player

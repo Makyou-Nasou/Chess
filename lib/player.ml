@@ -1,4 +1,3 @@
-open Piece
 open Global
 
 type player = { color : color; last_move : move option }
