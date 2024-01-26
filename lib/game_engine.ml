@@ -25,3 +25,12 @@ let move (g : game) (m : move) =
   with
   | None -> None
   | Some b -> Some { g with board = b }
+
+exeption No_king
+
+let end_of_game game = match chess_mate game.board White with 
+|Some b when b -> Some White 
+|Some b when not b -> (match chess_mate game.board Black with
+                            | Some b when b -> Some Black 
+                            | _ -> None)
+|None -> raise No_king

@@ -11,3 +11,4 @@ val get_line_from_board : board -> int -> piece option list
 val empty_straight : board -> coordonne -> coordonne -> bool
 val empty_diagonal : board -> coordonne -> coordonne -> bool
 val move : board -> player -> player -> move -> board option
+val chess_mate : board -> color -> bool option
