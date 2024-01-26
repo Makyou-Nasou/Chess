@@ -3,7 +3,6 @@ open Player
 open Global
 
 type board = piece option list list
-type move = Movement of coordonne * coordonne | Small_Castling | Big_Castling
 
 let get_starter_piece ((line, column) : coordonne) =
   match line with
@@ -105,18 +104,18 @@ let can_move (b : board) (p : piece) (coord_start : coordonne)
           || distance_line = -1
       | _ -> true || b = b)
 
-let classic_move (b : board) (p : player) (m : move) =
+let move (b : board) (p : player) (m : move) =
   match m with
   | Movement (coord_start, coord_final) -> (
       match get_piece b coord_start with
       | None -> None
       | Some piece ->
           if
-            piece.color = p.color
+            piece.color = get_color_from_player p
             &&
             match get_piece b coord_final with
             | None -> true
-            | Some piece_coord_final -> piece_coord_final.color <> p.color
+            | Some piece_coord_final -> piece_coord_final.color <> get_color_from_player p
           then
             if can_move b piece coord_start coord_final then
               Some (switch_coord b coord_start coord_final)
