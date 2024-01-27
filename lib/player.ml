@@ -1,12 +1,13 @@
 open Global
-open Board
+open Piece
 
 type player = {
   color : color;
   last_move : move option;
-  choose_move : board -> move option;
+  choose_move : piece option array array -> move option;
 }
 
+let set_last_move_to_player p m = { p with last_move = Some m }
 let init_player choose_move c = { color = c; last_move = None; choose_move }
 let get_color_from_player (p : player) = p.color
 let get_last_move_from_player (p : player) = p.last_move
@@ -37,13 +38,13 @@ let rec request question =
         else
           let (x1, y1), (x2, y2) = convert_coordinates s in
           if
-            x1 < 0 || x1 > 7 || y1 < 0 || y1 > 7 || x2 < 0 || x2 > 7 || y2 < 0
-            || y2 > 7
+            (not (is_valide_coordinates (x1, y1)))
+            || not (is_valide_coordinates (x2, y2))
           then (
             Format.printf "Invalid entry.@;";
             request question)
           else
-            let () = Format.printf "%i %i %i %i@;" x1 y1 x2 y2 in
+            (*let () = Format.printf "%i %i %i %i@;" x1 y1 x2 y2 in*)
             Some (Movement ((x1, y1), (x2, y2))))
   with Failure _ ->
     Format.printf "Invalid entry.@;";

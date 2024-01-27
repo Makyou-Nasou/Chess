@@ -2,35 +2,48 @@ open Player
 open Board
 open Global
 
-type game = { current_player : int; players : player list; board : board }
+type game = {
+  current_player_indice : int;
+  players : player list;
+  board : board;
+}
 
 let pp_game fmt game = pp_board fmt game.board
 
 let init_game chose_move_black chose_move_white =
   {
-    current_player = 0;
+    current_player_indice = 0;
     players =
       [ init_player chose_move_black White; init_player chose_move_white Black ];
     board = init_board ();
   }
 
 let set_next_player_from_game g =
-  { g with current_player = 1 - g.current_player }
+  { g with current_player_indice = 1 - g.current_player_indice }
 
-let get_current_player_from_game g = List.nth g.players g.current_player
-let get_next_player_from_game g = List.nth g.players (1 - g.current_player)
+let get_current_player_from_game g = List.nth g.players g.current_player_indice
 
-let move (g : game) (m : move) =
+let get_next_player_from_game g =
+  List.nth g.players (1 - g.current_player_indice)
+
+let get_board_from_game g = g.board
+
+let set_move_played g m =
+  {
+    g with
+    players =
+      List.init 2 (fun i ->
+          let p = List.nth g.players i in
+          if (i = g.current_player_indice) then set_last_move_to_player p m else p);
+  }
+
+let play_move (g : game) (m : move) =
   let next_player = get_next_player_from_game g in
   match
-    Board.move g.board
-      (get_color_from_player (get_current_player_from_game g))
-      (get_color_from_player next_player)
-      (get_last_move_from_player next_player)
-      m
+    Board.play_move g.board (get_current_player_from_game g) m next_player
   with
   | None -> None
-  | Some b -> Some { g with board = b }
+  | Some b -> Some (set_move_played { g with board = b } m)
 
 exception No_King
 
@@ -60,11 +73,14 @@ let start_game chose_move_black chose_move_white =
         | White -> "white"
         | Black -> "black")
     in
-    let mv = (get_choose_move_from_player current_player) game.board in
+    let mv =
+      (get_choose_move_from_player current_player)
+        (get_value_of_board game.board)
+    in
     match mv with
     | None -> None
     | Some mv -> (
-        match move game mv with
+        match play_move game mv with
         | Some game -> (
             let new_game = set_next_player_from_game game in
             match try end_of_game new_game with No_King -> None with

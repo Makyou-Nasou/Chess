@@ -1,5 +1,6 @@
 open Piece
 open Global
+open Player
 
 type board
 
@@ -8,5 +9,6 @@ val pp_board : Format.formatter -> board -> unit
 val get_piece : board -> coordinates -> piece option
 val empty_straight : board -> coordinates -> coordinates -> bool
 val empty_diagonal : board -> coordinates -> coordinates -> bool
-val move : board -> color -> color -> move option -> move -> board option
+val play_move : board -> player -> move -> player -> board option
 val chess_mate : board -> color -> bool option
+val get_value_of_board : board -> piece option array array
