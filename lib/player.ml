@@ -42,7 +42,9 @@ let rec request question =
           then (
             Format.printf "Invalid entry.@;";
             request question)
-          else Some (Movement ((x1, y1), (x2, y2))))
+          else
+            let () = Format.printf "%i %i %i %i@;" x1 y1 x2 y2 in
+            Some (Movement ((x1, y1), (x2, y2))))
   with Failure _ ->
     Format.printf "Invalid entry.@;";
     request question

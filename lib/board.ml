@@ -4,6 +4,7 @@ open Global
 type board = piece option list list
 
 let get_starter_piece ((line, column) : coordinates) =
+  assert (is_valide_coordinates (line, column));
   match line with
   | 1 -> Some { shape = Pawn true; color = Black }
   | 6 -> Some { shape = Pawn true; color = White }
@@ -26,8 +27,6 @@ let get_starter_piece ((line, column) : coordinates) =
       match (color, shape) with
       | None, _ | _, None -> None
       | Some c, Some s -> Some { shape = s; color = c })
-
-let get_line_from_board (b : board) i = List.nth b i
 
 let init_board () =
   List.init 8 (fun line ->
@@ -66,20 +65,18 @@ let pp_board fmt board =
   print_board 0
 
 let get_piece (b : board) (c : coordinates) =
-  match c with x, y -> List.nth (List.nth b x) y
+  if is_valide_coordinates c then
+    match c with x, y -> List.nth (List.nth b x) y
+  else raise Invalide_coordinates
 
 (*We don’t check whether the starting box or the arriving box are empty.
    We just look at whether the intermediate boxes are empty.*)
 let empty_straight (b : board) (coord_start : coordinates)
     (coord_final : coordinates) =
-  match (coord_start, coord_final) with
-  | ( (coord_start_line, coord_start_column),
-      (coord_final_line, coord_final_column) ) ->
-      if
-        coord_start_line < 0 || coord_start_line > 7 || coord_final_line < 0
-        || coord_final_column > 7
-      then false
-      else
+  if is_valide_coordinates coord_start && is_valide_coordinates coord_final then
+    match (coord_start, coord_final) with
+    | ( (coord_start_line, coord_start_column),
+        (coord_final_line, coord_final_column) ) ->
         let distance_line = coord_start_line - coord_final_line in
         let distance_column = coord_start_column - coord_final_column in
         if distance_column <> 0 && distance_line <> 0 then false
@@ -93,7 +90,8 @@ let empty_straight (b : board) (coord_start : coordinates)
             else -1
           in
           let rec aux (coord_current_line, coord_current_line_colum) =
-            if coord_start = coord_final then true
+            if (coord_current_line, coord_current_line_colum) = coord_final then
+              true
             else
               get_piece b (coord_current_line, coord_current_line_colum) = None
               && aux
@@ -101,27 +99,26 @@ let empty_straight (b : board) (coord_start : coordinates)
                      coord_current_line_colum + dir_column )
           in
           aux (coord_start_line + dir_line, coord_start_column + dir_column)
+  else raise Invalide_coordinates
 
 (*We don’t check whether the starting box or the arriving box are empty.
    We just look at whether the intermediate boxes are empty.*)
 let empty_diagonal (b : board) (coord_start : coordinates)
     (coord_final : coordinates) =
-  match (coord_start, coord_final) with
-  | ( (coord_start_line, coord_start_column),
-      (coord_final_line, coord_final_column) ) ->
-      if
-        coord_start_line < 0 || coord_start_line > 7 || coord_final_line < 0
-        || coord_final_column > 7
-      then false
-      else
+  if is_valide_coordinates coord_start && is_valide_coordinates coord_final then
+    match (coord_start, coord_final) with
+    | ( (coord_start_line, coord_start_column),
+        (coord_final_line, coord_final_column) ) ->
         let distance_line = coord_start_line - coord_final_line in
         let distance_column = coord_start_column - coord_final_column in
-        if distance_column <> distance_line then false
+        if distance_column <> distance_line && distance_column <> -distance_line
+        then false
         else
           let dir_line = if distance_line < 0 then 1 else -1 in
           let dir_column = if distance_column < 0 then 1 else -1 in
           let rec aux (coord_current_line, coord_current_line_colum) =
-            if coord_start = coord_final then true
+            if (coord_current_line, coord_current_line_colum) = coord_final then
+              true
             else
               get_piece b (coord_current_line, coord_current_line_colum) = None
               && aux
@@ -129,60 +126,54 @@ let empty_diagonal (b : board) (coord_start : coordinates)
                      coord_current_line_colum + dir_column )
           in
           aux (coord_start_line + dir_line, coord_start_column + dir_column)
+  else raise Invalide_coordinates
 
 (*We assume that the arrival box is empty or occupied by an enemy.
    That the starting box is occupied by the piece given as an argument.*)
 let can_move (b : board) (p : piece) (coord_start : coordinates)
     (coord_final : coordinates) =
-  match (coord_start, coord_final) with
-  | ( (coord_start_line, coord_start_column),
-      (coord_final_line, coord_final_column) ) -> (
-      if
-        coord_start_line < 0 || coord_start_line > 7 || coord_start_column < 0
-        || coord_start_column > 7 || coord_final_line < 0
-        || coord_final_line > 7 || coord_final_column < 0
-        || coord_final_column > 7
-      then false
-      else
-        let distance_line = coord_start_line - coord_final_line in
-        let distance_column = coord_start_column - coord_final_column in
-        match p.shape with
-        | King _ ->
-            (distance_column = 1 || distance_column = -1 || distance_line = 1
-           || distance_line = -1)
-            && distance_column <= 1 && distance_column >= -1
-            && distance_line <= 1 && distance_line >= -1
-        | Queen ->
-            (distance_column = distance_line
-            || distance_column = -distance_line
-               && empty_diagonal b coord_start coord_final)
-            || ((distance_column = 0 && distance_line <> 0)
-               || (distance_line = 0 && distance_line <> 0))
-               && empty_straight b coord_start coord_final
-        | Bishop ->
-            distance_column = distance_line
-            || distance_column = -distance_line
-               && empty_diagonal b coord_start coord_final
-        | Rook _ ->
-            ((distance_column = 0 && distance_line <> 0)
-            || (distance_line = 0 && distance_line <> 0))
-            && empty_straight b coord_start coord_final
-        | Horse ->
-            (distance_line = 2 || distance_line = -2)
-            && (distance_column = 1 || distance_column = -1)
-            || (distance_line = 1 || distance_line = -1)
-               && (distance_column = 2 || distance_column = -2)
-        | Pawn first_move ->
-            (distance_column = 0
-             && ((distance_line = 2 && p.color = White)
-                || (distance_line = -2 && p.color = Black))
-             && first_move
-            || (distance_line = 1 && p.color = White)
-            || (distance_line = -1 && p.color = Black))
-            || (distance_column = 1 || distance_column = -1)
-               && ((distance_line = 1 && p.color = White)
-                  || (distance_line = -1 && p.color = Black))
-               && get_piece b coord_final <> None)
+  if is_valide_coordinates coord_start && is_valide_coordinates coord_final then
+    match (coord_start, coord_final) with
+    | ( (coord_start_line, coord_start_column),
+        (coord_final_line, coord_final_column) ) -> (
+        if
+          coord_start_line < 0 || coord_start_line > 7 || coord_start_column < 0
+          || coord_start_column > 7 || coord_final_line < 0
+          || coord_final_line > 7 || coord_final_column < 0
+          || coord_final_column > 7
+        then false
+        else
+          let distance_line = coord_start_line - coord_final_line in
+          let distance_column = coord_start_column - coord_final_column in
+          match p.shape with
+          | King _ ->
+              (distance_column = 1 || distance_column = -1 || distance_line = 1
+             || distance_line = -1)
+              && distance_column <= 1 && distance_column >= -1
+              && distance_line <= 1 && distance_line >= -1
+          | Queen ->
+              empty_diagonal b coord_start coord_final
+              || empty_straight b coord_start coord_final
+          | Bishop -> empty_diagonal b coord_start coord_final
+          | Rook _ -> empty_straight b coord_start coord_final
+          | Horse ->
+              (distance_line = 2 || distance_line = -2)
+              && (distance_column = 1 || distance_column = -1)
+              || (distance_line = 1 || distance_line = -1)
+                 && (distance_column = 2 || distance_column = -2)
+          | Pawn first_move ->
+              distance_column = 0
+              && (((distance_line = 2 && p.color = White)
+                  || (distance_line = -2 && p.color = Black))
+                  && first_move
+                 || (distance_line = 1 && p.color = White)
+                 || (distance_line = -1 && p.color = Black))
+              && get_piece b coord_final = None
+              || (distance_column = 1 || distance_column = -1)
+                 && ((distance_line = 1 && p.color = White)
+                    || (distance_line = -1 && p.color = Black))
+                 && get_piece b coord_final <> None)
+  else raise Invalide_coordinates
 
 let set_element_list list indice new_element =
   let rec aux_set_list list current_indice =
@@ -197,6 +188,7 @@ let set_element_list list indice new_element =
 (*Removes the part from the starting coordinate. Puts the deleted part on the new coordinate*)
 let move_from_coord_to_coord (b : board) (coord_start : coordinates)
     (coord_final : coordinates) =
+  assert (is_valide_coordinates coord_start && is_valide_coordinates coord_final);
   match (coord_start, coord_final) with
   | ( (start_line_number, start_column_number),
       (final_line_number, final_column_number) ) ->
@@ -226,6 +218,7 @@ let move_from_coord_to_coord (b : board) (coord_start : coordinates)
         set_element_list b start_line_number start_line
 
 let delete_piece (b : board) ((cl, cc) : coordinates) =
+  assert (is_valide_coordinates (cl, cc));
   let new_line = set_element_list (List.nth b cl) cc None in
   set_element_list b cl new_line
 
@@ -233,6 +226,9 @@ let try_passant (b : board) (p : piece) (next_player_color : color)
     (next_player_last_move : move option) (m : move) =
   match m with
   | Movement (current_move_coord_start, current_move_coord_final) -> (
+      assert (
+        is_valide_coordinates current_move_coord_start
+        && is_valide_coordinates current_move_coord_final);
       match p.shape with
       | Pawn _ -> (
           match next_player_last_move with
@@ -266,17 +262,19 @@ let try_passant (b : board) (p : piece) (next_player_color : color)
   | _ -> None
 
 let attacked_coord_by_enemy (b : board) (coord : coordinates) (c : color) =
-  let rec aux i j =
-    if i > 7 then false
-    else if j > 7 then aux (i + 1) 0
-    else
-      match get_piece b (i, j) with
-      | Some piece ->
-          if c <> piece.color && can_move b piece (i, j) coord then true
-          else aux i (j + 1)
-      | None -> aux i (j + 1)
-  in
-  aux 0 0
+  if is_valide_coordinates coord then
+    let rec aux i j =
+      if i > 7 then false
+      else if j > 7 then aux (i + 1) 0
+      else
+        match get_piece b (i, j) with
+        | Some piece ->
+            if c <> piece.color && can_move b piece (i, j) coord then true
+            else aux i (j + 1)
+        | None -> aux i (j + 1)
+    in
+    aux 0 0
+  else raise Invalide_coordinates
 
 let chess (b : board) (c : color) : bool option =
   let rec aux line column =
@@ -323,39 +321,44 @@ let chess_mate (b : board) (c : color) =
 let move (b : board) (current_player_color : color) (next_player_color : color)
     (next_player_last_move : move option) (current_player_move : move) =
   match current_player_move with
-  | Movement (coord_start, coord_final) -> (
-      match get_piece b coord_start with
-      | None -> None
-      | Some piece ->
-          if
-            piece.color = current_player_color
-            &&
-            match get_piece b coord_final with
-            | None -> true
-            | Some piece_coord_final ->
-                piece_coord_final.color <> current_player_color
-          then
-            if can_move b piece coord_start coord_final then
-              let new_b = move_from_coord_to_coord b coord_start coord_final in
-              if
-                let are_chess = chess new_b current_player_color in
-                are_chess = Some true || are_chess = None
-              then None
-              else Some new_b
-            else
-              let new_b =
-                try_passant b piece next_player_color next_player_last_move
-                  current_player_move
-              in
-              match new_b with
-              | Some new_b ->
-                  if
-                    let are_chess = chess new_b current_player_color in
-                    are_chess = Some true || are_chess = None
-                  then None
-                  else Some new_b
-              | None -> None
-          else None)
+  | Movement (coord_start, coord_final) ->
+      if is_valide_coordinates coord_start && is_valide_coordinates coord_final
+      then
+        match get_piece b coord_start with
+        | None -> None
+        | Some piece ->
+            if
+              piece.color = current_player_color
+              &&
+              match get_piece b coord_final with
+              | None -> true
+              | Some piece_coord_final ->
+                  piece_coord_final.color <> current_player_color
+            then
+              if can_move b piece coord_start coord_final then
+                let new_b =
+                  move_from_coord_to_coord b coord_start coord_final
+                in
+                if
+                  let are_chess = chess new_b current_player_color in
+                  are_chess = Some true || are_chess = None
+                then None
+                else Some new_b
+              else
+                let new_b =
+                  try_passant b piece next_player_color next_player_last_move
+                    current_player_move
+                in
+                match new_b with
+                | Some new_b ->
+                    if
+                      let are_chess = chess new_b current_player_color in
+                      are_chess = Some true || are_chess = None
+                    then None
+                    else Some new_b
+                | None -> None
+            else None
+      else raise Invalide_coordinates
   | Big_Castling -> (
       let coord_king =
         if current_player_color = Black then (0, 4) else (7, 4)
