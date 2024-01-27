@@ -15,14 +15,11 @@ let get_starter_piece ((line, column) : coordinates) =
       in
       let shape =
         match column with
-        | 0 -> Some (Rook true)
-        | 1 -> Some Horse
-        | 2 -> Some Bishop
+        | 0 | 7 -> Some (Rook true)
+        | 1 | 6 -> Some Horse
+        | 2 | 5 -> Some Bishop
         | 3 -> Some Queen
         | 4 -> Some (King true)
-        | 5 -> Some Bishop
-        | 6 -> Some Horse
-        | 7 -> Some (Rook true)
         | _ -> None
       in
       match (color, shape) with
@@ -442,5 +439,61 @@ let play_move (b : board) (current_player : player) (m : move)
             else Some new_b
           else None
       | _, _ -> None)
+  | _ -> None
 
 let get_value_of_board b = Array.copy b
+
+let adjacent_possibles_move (piece : piece) ((l, c) : coordinates) =
+  List.filter
+    (fun c -> is_valide_coordinates c)
+    (match piece.shape with
+    | Rook _ -> [ (l + 1, c); (l, c + 1); (l - 1, c); (l, c - 1) ]
+    | Horse ->
+        [
+          (l + 1, c + 2);
+          (l + 2, c + 1);
+          (l + 1, c - 2);
+          (l - 2, c + 1);
+          (l - 1, c + 2);
+          (l + 2, c - 1);
+          (l - 2, c - 1);
+          (l - 1, c - 2);
+        ]
+    | Bishop ->
+        [ (l + 1, c + 1); (l - 1, c + 1); (l - 1, c - 1); (l + 1, c - 1) ]
+    | Pawn _ | Queen | King _ ->
+        [
+          (l + 1, c + 1);
+          (l - 1, c + 1);
+          (l - 1, c - 1);
+          (l + 1, c - 1);
+          (l + 1, c);
+          (l, c + 1);
+          (l - 1, c);
+          (l, c - 1);
+        ])
+
+let stalemate b current_player next_player =
+  let rec aux l c =
+    if l > 7 then true
+    else if c > 7 then aux (l + 1) 0
+    else
+      let current_piece = get_piece b (l, c) in
+      match current_piece with
+      | Some current_piece ->
+          if
+            List.exists
+              (fun coord ->
+                match
+                  play_move b current_player
+                    (Movement ((l, c), coord))
+                    next_player
+                with
+                | None -> false
+                | _ -> true)
+              (adjacent_possibles_move current_piece (l, c))
+          then false
+          else aux l (c + 1)
+      | None -> aux l (c + 1)
+  in
+  aux 0 0

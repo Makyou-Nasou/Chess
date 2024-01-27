@@ -12,3 +12,4 @@ val empty_diagonal : board -> coordinates -> coordinates -> bool
 val play_move : board -> player -> move -> player -> board option
 val chess_mate : board -> color -> bool option
 val get_value_of_board : board -> piece option array array
+val stalemate : board -> player -> player -> bool
