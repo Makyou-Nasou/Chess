@@ -3,7 +3,7 @@ open Global
 
 type board = piece option list list
 
-let get_starter_piece ((line, column) : coordonne) =
+let get_starter_piece ((line, column) : coordinates) =
   match line with
   | 1 -> Some { shape = Pawn true; color = Black }
   | 6 -> Some { shape = Pawn true; color = White }
@@ -65,13 +65,13 @@ let pp_board fmt board =
   in
   print_board 0
 
-let get_piece (b : board) (c : coordonne) =
+let get_piece (b : board) (c : coordinates) =
   match c with x, y -> List.nth (List.nth b x) y
 
 (*We don’t check whether the starting box or the arriving box are empty.
    We just look at whether the intermediate boxes are empty.*)
-let empty_straight (b : board) (coord_start : coordonne)
-    (coord_final : coordonne) =
+let empty_straight (b : board) (coord_start : coordinates)
+    (coord_final : coordinates) =
   match (coord_start, coord_final) with
   | ( (coord_start_line, coord_start_column),
       (coord_final_line, coord_final_column) ) ->
@@ -104,8 +104,8 @@ let empty_straight (b : board) (coord_start : coordonne)
 
 (*We don’t check whether the starting box or the arriving box are empty.
    We just look at whether the intermediate boxes are empty.*)
-let empty_diagonal (b : board) (coord_start : coordonne)
-    (coord_final : coordonne) =
+let empty_diagonal (b : board) (coord_start : coordinates)
+    (coord_final : coordinates) =
   match (coord_start, coord_final) with
   | ( (coord_start_line, coord_start_column),
       (coord_final_line, coord_final_column) ) ->
@@ -132,8 +132,8 @@ let empty_diagonal (b : board) (coord_start : coordonne)
 
 (*We assume that the arrival box is empty or occupied by an enemy.
    That the starting box is occupied by the piece given as an argument.*)
-let can_move (b : board) (p : piece) (coord_start : coordonne)
-    (coord_final : coordonne) =
+let can_move (b : board) (p : piece) (coord_start : coordinates)
+    (coord_final : coordinates) =
   match (coord_start, coord_final) with
   | ( (coord_start_line, coord_start_column),
       (coord_final_line, coord_final_column) ) -> (
@@ -195,8 +195,8 @@ let set_element_list list indice new_element =
   aux_set_list list 0
 
 (*Removes the part from the starting coordinate. Puts the deleted part on the new coordinate*)
-let move_from_coord_to_coord (b : board) (coord_start : coordonne)
-    (coord_final : coordonne) =
+let move_from_coord_to_coord (b : board) (coord_start : coordinates)
+    (coord_final : coordinates) =
   match (coord_start, coord_final) with
   | ( (start_line_number, start_column_number),
       (final_line_number, final_column_number) ) ->
@@ -225,7 +225,7 @@ let move_from_coord_to_coord (b : board) (coord_start : coordonne)
         let b = set_element_list b final_line_number final_line in
         set_element_list b start_line_number start_line
 
-let delete_piece (b : board) ((cl, cc) : coordonne) =
+let delete_piece (b : board) ((cl, cc) : coordinates) =
   let new_line = set_element_list (List.nth b cl) cc None in
   set_element_list b cl new_line
 
@@ -265,7 +265,7 @@ let try_passant (b : board) (p : piece) (next_player_color : color)
       | _ -> None)
   | _ -> None
 
-let attacked_coord_by_enemy (b : board) (coord : coordonne) (c : color) =
+let attacked_coord_by_enemy (b : board) (coord : coordinates) (c : color) =
   let rec aux i j =
     if i > 7 then false
     else if j > 7 then aux (i + 1) 0

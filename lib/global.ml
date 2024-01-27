@@ -1,3 +1,8 @@
-type coordonne = int * int
-type move = Movement of coordonne * coordonne | Small_Castling | Big_Castling
+type coordinates = int * int
+
+type move =
+  | Movement of coordinates * coordinates
+  | Small_Castling
+  | Big_Castling
+
 type color = Black | White
