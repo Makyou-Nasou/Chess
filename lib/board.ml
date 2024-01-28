@@ -2,7 +2,11 @@ open Piece
 open Global
 open Player
 
-type board = { board : piece option list list; last_move : move option }
+type board = {
+  board : piece option list list;
+  last_move : move option;
+  dead_piece : piece option list;
+}
 
 let get_starter_piece ((line, column) : coordinates) =
   assert (is_valide_coordinates (line, column));
@@ -32,6 +36,7 @@ let init_board () =
       List.init 8 (fun line ->
           List.init 8 (fun column -> get_starter_piece (line, column)));
     last_move = None;
+    dead_piece = [];
   }
 
 let pp_board fmt b =
@@ -64,17 +69,36 @@ let pp_board fmt b =
       print_board (i + 1))
     else ()
   in
-  print_board 0
+  let () = print_board 0 in
+  let rec print_dead_piece l =
+    match l with
+    | Some p :: t ->
+        pp_piece fmt p;
+        Format.fprintf fmt " ";
+        print_dead_piece t
+    | None :: t ->
+        Format.fprintf fmt "? ";
+        print_dead_piece t
+    | [] -> ()
+  in
+  if List.length b.dead_piece <> 0 then
+    let () = Format.fprintf fmt "Dead piece :@ " in
+    let () = print_dead_piece b.dead_piece in
+    Format.fprintf fmt "@ "
+  else ()
 
 let get_board_from_board b = b.board
 
 let get_piece (b : board) (c : coordinates) =
   if is_valide_coordinates c then
     match c with x, y -> List.nth (List.nth b.board x) y
-  else raise Invalide_coordinates
+  else
+    let () = Format.printf "1@ " in
+    raise Invalide_coordinates
 
 let set_piece (b : board) (line, column) piece =
   {
+    b with
     board =
       List.mapi
         (fun i current_line ->
@@ -85,7 +109,6 @@ let set_piece (b : board) (line, column) piece =
               current_line
           else current_line)
         b.board;
-    last_move = b.last_move;
   }
 
 (*We don’t check whether the starting box or the arriving box are empty.
@@ -118,7 +141,9 @@ let empty_straight (b : board) (coord_start : coordinates)
                      coord_current_line_colum + dir_column )
           in
           aux (coord_start_line + dir_line, coord_start_column + dir_column)
-  else raise Invalide_coordinates
+  else
+    let () = Format.printf "2@ " in
+    raise Invalide_coordinates
 
 (*We don’t check whether the starting box or the arriving box are empty.
    We just look at whether the intermediate boxes are empty.*)
@@ -145,7 +170,9 @@ let empty_diagonal (b : board) (coord_start : coordinates)
                      coord_current_line_colum + dir_column )
           in
           aux (coord_start_line + dir_line, coord_start_column + dir_column)
-  else raise Invalide_coordinates
+  else
+    let () = Format.printf "3@ " in
+    raise Invalide_coordinates
 
 (*We assume that the arrival box is empty or occupied by an enemy.
    That the starting box is occupied by the piece given as an argument.*)
@@ -185,7 +212,9 @@ let can_move (b : board) (p : piece) (coord_start : coordinates)
                && ((distance_line = 1 && p.color = White)
                   || (distance_line = -1 && p.color = Black))
                && get_piece b coord_final <> None)
-  else raise Invalide_coordinates
+  else
+    let () = Format.printf "4@ " in
+    raise Invalide_coordinates
 
 (*Removes the piece from the starting coordinate.
    Puts the deleted piece on the new coordinate*)
@@ -259,6 +288,11 @@ let try_passant (b : board) (p : piece) (m : move) (next_player : player) =
                             = current_move_coord_final
                         in
                         if attack_good_coord_for_en_passant then
+                          let dead_piece =
+                            get_piece b
+                              ( previous_move_coord_final_line,
+                                previous_move_coord_final_column )
+                          in
                           let b =
                             set_piece b
                               ( previous_move_coord_final_line,
@@ -269,7 +303,8 @@ let try_passant (b : board) (p : piece) (m : move) (next_player : player) =
                             move_from_coord_to_coord b current_move_coord_start
                               current_move_coord_final
                           in
-                          Some b
+                          Some
+                            { b with dead_piece = dead_piece :: b.dead_piece }
                         else None
                       else None
                   | _ -> None)
@@ -292,7 +327,9 @@ let attacked_coord_by_enemy (b : board) (coord : coordinates) (c : color) =
         | None -> aux i (j + 1)
     in
     aux 0 0
-  else raise Invalide_coordinates
+  else
+    let () = Format.printf "5@ " in
+    raise Invalide_coordinates
 
 (*Check if the player c is losing or not*)
 let chess (b : board) (c : color) : bool option =
@@ -327,15 +364,40 @@ let chess_mate (b : board) (c : color) =
   match king_coord with
   | Some (line, column) ->
       Some
-        (attacked_coord_by_enemy b (line, column) c
-        && attacked_coord_by_enemy b (line + 1, column) c
-        && attacked_coord_by_enemy b (line + 1, column + 1) c
-        && attacked_coord_by_enemy b (line, column + 1) c
-        && attacked_coord_by_enemy b (line - 1, column + 1) c
-        && attacked_coord_by_enemy b (line - 1, column) c
-        && attacked_coord_by_enemy b (line - 1, column - 1) c
-        && attacked_coord_by_enemy b (line, column - 1) c
-        && attacked_coord_by_enemy b (line + 1, column - 1) c)
+        (try attacked_coord_by_enemy b (line, column) c
+         with Invalide_coordinates -> (
+           true
+           &&
+           try attacked_coord_by_enemy b (line + 1, column) c
+           with Invalide_coordinates -> (
+             true
+             &&
+             try attacked_coord_by_enemy b (line + 1, column + 1) c
+             with Invalide_coordinates -> (
+               true
+               &&
+               try attacked_coord_by_enemy b (line, column + 1) c
+               with Invalide_coordinates -> (
+                 true
+                 &&
+                 try attacked_coord_by_enemy b (line - 1, column + 1) c
+                 with Invalide_coordinates -> (
+                   true
+                   &&
+                   try attacked_coord_by_enemy b (line - 1, column) c
+                   with Invalide_coordinates -> (
+                     true
+                     &&
+                     try attacked_coord_by_enemy b (line - 1, column - 1) c
+                     with Invalide_coordinates -> (
+                       true
+                       &&
+                       try attacked_coord_by_enemy b (line, column - 1) c
+                       with Invalide_coordinates -> (
+                         true
+                         &&
+                         try attacked_coord_by_enemy b (line + 1, column - 1) c
+                         with Invalide_coordinates -> true)))))))))
   | None -> None
 
 let need_promotion b current_player (coord_final_line, coord_final_column) =
@@ -356,13 +418,16 @@ let play_move (b : board) (current_player : player) (m : move)
         match get_piece b coord_start with
         | None -> None
         | Some piece ->
+            let dead_piece = get_piece b coord_final in
+            let empty_destination, enemy_on_destination =
+              match dead_piece with
+              | None -> (true, false)
+              | Some piece_coord_final ->
+                  (false, piece_coord_final.color <> current_player_color)
+            in
             if
               piece.color = current_player_color
-              &&
-              match get_piece b coord_final with
-              | None -> true
-              | Some piece_coord_final ->
-                  piece_coord_final.color <> current_player_color
+              && (empty_destination || enemy_on_destination)
             then
               if can_move b piece coord_start coord_final then
                 let b = move_from_coord_to_coord b coord_start coord_final in
@@ -379,7 +444,21 @@ let play_move (b : board) (current_player : player) (m : move)
                            color = current_player_color;
                          })
                   in
-                  Some { b with last_move = Some m }
+                  if enemy_on_destination then
+                    Some
+                      {
+                        b with
+                        last_move = Some m;
+                        dead_piece = dead_piece :: b.dead_piece;
+                      }
+                  else Some { b with last_move = Some m }
+                else if enemy_on_destination then
+                  Some
+                    {
+                      b with
+                      last_move = Some m;
+                      dead_piece = dead_piece :: b.dead_piece;
+                    }
                 else Some { b with last_move = Some m }
               else
                 match try_passant b piece m next_player with
@@ -390,8 +469,10 @@ let play_move (b : board) (current_player : player) (m : move)
                     then None
                     else Some { b with last_move = Some m }
                 | None -> None
-            else Some { b with last_move = Some m }
-      else raise Invalide_coordinates
+            else None
+      else
+        let () = Format.printf "6@ " in
+        raise Invalide_coordinates
   | Big_Castling -> (
       let coord_king =
         if current_player_color = Black then (0, 4) else (7, 4)

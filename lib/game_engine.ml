@@ -91,6 +91,7 @@ let threefold_repetitions g =
 let start_game strategy_white strategy_black =
   let rec aux game nbr_try =
     if nbr_try = 0 then
+      let () = pp_game Format.std_formatter game in
       let () =
         Format.fprintf Format.std_formatter "You have tried 3 attempts ...@ "
       in
@@ -110,6 +111,7 @@ let start_game strategy_white strategy_black =
       in
       match mv with
       | Give_Up ->
+          let () = pp_game Format.std_formatter game in
           Some (Winner (get_color_from_player (get_next_player_from_game game)))
       | Propose_Draw ->
           let () =
@@ -122,22 +124,28 @@ let start_game strategy_white strategy_black =
           if
             (get_choose_accept_draw (get_next_player_from_game game))
               (get_board_from_board game.board)
-          then Some Draw
+          then
+            let () = pp_game Format.std_formatter game in
+            Some Draw
           else aux game (nbr_try - 1)
       | mv -> (
           match play_move game mv with
           | Some game -> (
               let game = set_next_player_from_game game in
               match try end_of_game game with No_King -> None with
-              | Some t -> Some (Winner t)
+              | Some t ->
+                  let () = pp_game Format.std_formatter game in
+                  Some (Winner t)
               | None ->
                   if threefold_repetitions game then
+                    let () = pp_game Format.std_formatter game in
                     let () =
                       Format.fprintf Format.std_formatter
                         "More than 3 repetitions.@ "
                     in
                     Some Draw
                   else if game.fifty_moves > 50 then
+                    let () = pp_game Format.std_formatter game in
                     let () =
                       Format.fprintf Format.std_formatter
                         "More than 50 moves without moving pawns or eating \
@@ -149,6 +157,7 @@ let start_game strategy_white strategy_black =
                       (get_current_player_from_game game)
                       (get_next_player_from_game game)
                   then
+                    let () = pp_game Format.std_formatter game in
                     let () =
                       Format.fprintf Format.std_formatter "Stalemate.@ "
                     in
