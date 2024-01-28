@@ -6,6 +6,7 @@ type game = {
   current_player_indice : int;
   players : player list;
   board : board;
+  fifty_moves : int;
 }
 
 let pp_game fmt game = pp_board fmt game.board
@@ -16,6 +17,7 @@ let init_game strategy_white strategy_black =
     players =
       [ init_player White strategy_white; init_player Black strategy_black ];
     board = init_board ();
+    fifty_moves = 0;
   }
 
 let set_next_player_from_game g =
@@ -38,11 +40,29 @@ let set_move_played g m =
   }
 
 let play_move (g : game) (m : move) =
+  let current_player = get_current_player_from_game g in
+  let fifty_rule =
+    match m with
+    | Movement (coord_start, coord_final) -> (
+        (match get_piece g.board coord_start with
+        | Some { shape = Pawn _; color = _ } -> true
+        | _ -> false)
+        ||
+        match get_piece g.board coord_final with
+        | Some p -> p.color <> get_color_from_player current_player
+        | None -> false)
+    | _ -> false
+  in
   match
-    Board.play_move g.board (get_current_player_from_game g) m (get_next_player_from_game g)
+    Board.play_move g.board current_player m (get_next_player_from_game g)
   with
   | false -> None
-  | true -> Some (set_move_played g m)
+  | true ->
+      Some
+        (set_move_played
+           (if fifty_rule then { g with fifty_moves = 0 }
+            else { g with fifty_moves = g.fifty_moves + 1 })
+           m)
 
 exception No_King
 
@@ -65,7 +85,9 @@ let end_of_game game =
 let start_game strategy_white strategy_black =
   let rec aux game nbr_try =
     if nbr_try = 0 then
-      let () = Format.fprintf Format.std_formatter "You have tried 3 attempts ...@ " in
+      let () =
+        Format.fprintf Format.std_formatter "You have tried 3 attempts ...@ "
+      in
       Some (Winner (get_color_from_player (get_next_player_from_game game)))
     else
       let () = pp_game Format.std_formatter game in
@@ -103,7 +125,8 @@ let start_game strategy_white strategy_black =
               match try end_of_game new_game with No_King -> None with
               | Some t -> Some (Winner t)
               | None ->
-                  if
+                  if game.fifty_moves > 50 then Some Draw
+                  else if
                     stalemate game.board
                       (get_current_player_from_game game)
                       (get_next_player_from_game game)

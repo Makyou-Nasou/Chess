@@ -182,14 +182,14 @@ let move_from_coord_to_coord (b : board) (coord_start : coordinates)
         else Array.get b final_line_number
       in
       Array.set final_line final_column_number
-          (match piece with
-          | None -> None
-          | Some piece -> (
-              match piece.shape with
-              | King _ -> Some { piece with shape = King false }
-              | Rook _ -> Some { piece with shape = Rook false }
-              | Pawn _ -> Some { piece with shape = Pawn false }
-              | _ -> Some piece))
+        (match piece with
+        | None -> None
+        | Some piece -> (
+            match piece.shape with
+            | King _ -> Some { piece with shape = King false }
+            | Rook _ -> Some { piece with shape = Rook false }
+            | Pawn _ -> Some { piece with shape = Pawn false }
+            | _ -> Some piece))
 
 let delete_piece (b : board) ((cl, cc) : coordinates) =
   assert (is_valide_coordinates (cl, cc));
@@ -255,22 +255,18 @@ let try_passant (b : board) (p : piece) (m : move) (next_player : player) =
                               ( previous_move_coord_final_line,
                                 previous_move_coord_final_column )
                           in
-                          let () = (move_from_coord_to_coord b current_move_coord_start
-                               current_move_coord_final) in true
-                        else
-                          false
-                      else
-                        false
-                  | _ ->
-                    false)
-              | _ ->
-                false)
-          | _ ->
-            false)
-      | _ ->
-        false)
-  | _ ->
-    false
+                          let () =
+                            move_from_coord_to_coord b current_move_coord_start
+                              current_move_coord_final
+                          in
+                          true
+                        else false
+                      else false
+                  | _ -> false)
+              | _ -> false)
+          | _ -> false)
+      | _ -> false)
+  | _ -> false
 
 (*c is the colour of the person being attacked*)
 let attacked_coord_by_enemy (b : board) (coord : coordinates) (c : color) =
@@ -351,9 +347,7 @@ let play_move (b : board) (current_player : player) (m : move)
                   piece_coord_final.color <> current_player_color
             then
               if can_move b piece coord_start coord_final then
-                let () =
-                  move_from_coord_to_coord b coord_start coord_final
-                in
+                let () = move_from_coord_to_coord b coord_start coord_final in
                 if
                   let are_chess = chess b current_player_color in
                   are_chess = Some true || are_chess = None
@@ -388,9 +382,7 @@ let play_move (b : board) (current_player : player) (m : move)
               if current_player_color = Black then (0, 3) else (7, 3)
             in
             let () = move_from_coord_to_coord b coord_king new_coord_king in
-            let () =
-              move_from_coord_to_coord b coord_rook new_coord_rook
-            in
+            let () = move_from_coord_to_coord b coord_rook new_coord_rook in
             if
               let are_chess = chess b current_player_color in
               are_chess = Some true || are_chess = None
@@ -416,9 +408,7 @@ let play_move (b : board) (current_player : player) (m : move)
               if current_player_color = Black then (0, 5) else (7, 5)
             in
             let () = move_from_coord_to_coord b coord_king new_coord_king in
-            let () =
-              move_from_coord_to_coord b coord_rook new_coord_rook
-            in
+            let () = move_from_coord_to_coord b coord_rook new_coord_rook in
             if
               let are_chess = chess b current_player_color in
               are_chess = Some true || are_chess = None
@@ -428,7 +418,8 @@ let play_move (b : board) (current_player : player) (m : move)
       | _, _ -> false)
   | _ -> false
 
-let get_value_of_board b : piece option array array = Array.init 8 (fun i -> Array.copy (Array.get b i))
+let get_value_of_board b : piece option array array =
+  Array.init 8 (fun i -> Array.copy (Array.get b i))
 
 let adjacent_possibles_move (piece : piece) ((l, c) : coordinates) =
   List.filter
@@ -461,7 +452,7 @@ let adjacent_possibles_move (piece : piece) ((l, c) : coordinates) =
         ])
 
 let stalemate b current_player next_player =
-  let b = get_value_of_board b in 
+  let b = get_value_of_board b in
   let rec aux l c =
     if l > 7 then true
     else if c > 7 then aux (l + 1) 0
