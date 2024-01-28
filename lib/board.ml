@@ -263,25 +263,18 @@ let try_passant (b : board) (p : piece) (m : move) (next_player : player) =
                             (move_from_coord_to_coord b current_move_coord_start
                                current_move_coord_final)
                         else
-                          let () = Format.printf "1@;" in
                           None
                       else
-                        let () = Format.printf "2@;" in
                         None
                   | _ ->
-                      let () = Format.printf "3@;" in
                       None)
               | _ ->
-                  let () = Format.printf "4@;" in
                   None)
           | _ ->
-              let () = Format.printf "5@;" in
               None)
       | _ ->
-          let () = Format.printf "6@;" in
           None)
   | _ ->
-      let () = Format.printf "7@;" in
       None
 
 (*c is the colour of the person being attacked*)
@@ -441,7 +434,7 @@ let play_move (b : board) (current_player : player) (m : move)
       | _, _ -> None)
   | _ -> None
 
-let get_value_of_board b = Array.copy b
+let get_value_of_board b : piece option array array = Array.init 8 (fun i -> Array.copy (Array.get b i))
 
 let adjacent_possibles_move (piece : piece) ((l, c) : coordinates) =
   List.filter
@@ -474,6 +467,7 @@ let adjacent_possibles_move (piece : piece) ((l, c) : coordinates) =
         ])
 
 let stalemate b current_player next_player =
+  let b = get_value_of_board b in 
   let rec aux l c =
     if l > 7 then true
     else if c > 7 then aux (l + 1) 0

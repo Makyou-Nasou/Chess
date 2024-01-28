@@ -38,9 +38,8 @@ let set_move_played g m =
   }
 
 let play_move (g : game) (m : move) =
-  let next_player = get_next_player_from_game g in
   match
-    Board.play_move g.board (get_current_player_from_game g) m next_player
+    Board.play_move g.board (get_current_player_from_game g) m (get_next_player_from_game g)
   with
   | None -> None
   | Some b -> Some (set_move_played { g with board = b } m)
