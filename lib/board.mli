@@ -13,3 +13,4 @@ val play_move : board -> player -> move -> player -> bool
 val chess_mate : board -> color -> bool option
 val get_value_of_board : board -> piece option array array
 val stalemate : board -> player -> player -> bool
+val equals_boards : board -> piece option array array -> bool

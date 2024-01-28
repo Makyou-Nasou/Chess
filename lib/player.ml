@@ -4,6 +4,7 @@ open Piece
 type strategy = {
   choose_move : piece option array array -> move;
   choose_accept_draw : piece option array array -> bool;
+  choose_promotion : piece option array array -> shape;
 }
 
 type player = { color : color; last_move : move option; strategy : strategy }
@@ -14,6 +15,7 @@ let get_color_from_player (p : player) = p.color
 let get_last_move_from_player (p : player) = p.last_move
 let get_choose_move_from_player (p : player) = p.strategy.choose_move
 let get_choose_accept_draw (p : player) = p.strategy.choose_accept_draw
+let get_choose_promotion (p : player) = p.strategy.choose_promotion
 
 let convert_coordinates (coord : string) : (int * int) * (int * int) =
   let convert_char c = Char.code c - Char.code 'a' in
@@ -59,6 +61,18 @@ let rec request_yes_or_no question =
         Format.printf "Invalid entry : your answer is not correct.@;";
         request_yes_or_no question))
 
+let rec request_piece question =
+  Format.printf "%s (y or n to answer):@ " question;
+  Format.print_flush ();
+  Scanf.scanf "%s@\n" (fun s ->
+      if s = "Q" then Queen
+      else if s = "R" then Rook false
+      else if s = "B" then Bishop
+      else if s = "H" then Horse
+      else (
+        Format.printf "Invalid entry : your answer is not correct.@;";
+        request_piece question))
+
 let default_choose_move _ =
   request_action
     "Choose move on format : \"start finish\" (example : a2 a3) or \"bc\" for \
@@ -68,8 +82,14 @@ let default_choose_move _ =
 let default_choose_accept_draw _ =
   request_yes_or_no "Do you want to accept draw?"
 
+let default_choose_promotion _ =
+  request_piece
+    "What do you want to turn your pawn into? (Q for Queen, R for Rook, B for \
+     Bishop and H for Horse)"
+
 let default_strategy () =
   {
     choose_move = default_choose_move;
     choose_accept_draw = default_choose_accept_draw;
+    choose_promotion = default_choose_promotion;
   }

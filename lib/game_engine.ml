@@ -1,12 +1,14 @@
 open Player
 open Board
 open Global
+open Piece
 
 type game = {
   current_player_indice : int;
   players : player list;
   board : board;
   fifty_moves : int;
+  previous_position : piece option array array list;
 }
 
 let pp_game fmt game = pp_board fmt game.board
@@ -18,6 +20,7 @@ let init_game strategy_white strategy_black =
       [ init_player White strategy_white; init_player Black strategy_black ];
     board = init_board ();
     fifty_moves = 0;
+    previous_position = [];
   }
 
 let set_next_player_from_game g =
@@ -58,6 +61,12 @@ let play_move (g : game) (m : move) =
   with
   | false -> None
   | true ->
+      let g =
+        {
+          g with
+          previous_position = get_value_of_board g.board :: g.previous_position;
+        }
+      in
       Some
         (set_move_played
            (if fifty_rule then { g with fifty_moves = 0 }
@@ -81,6 +90,12 @@ let end_of_game game =
   | None ->
       let () = Format.fprintf Format.std_formatter "No king on the board. " in
       raise No_King
+
+let threefold_repetitions g =
+  List.fold_left
+    (fun acc e -> if equals_boards g.board e then acc + 1 else acc)
+    0 g.previous_position
+  >= 3
 
 let start_game strategy_white strategy_black =
   let rec aux game nbr_try =
@@ -125,12 +140,28 @@ let start_game strategy_white strategy_black =
               match try end_of_game new_game with No_King -> None with
               | Some t -> Some (Winner t)
               | None ->
-                  if game.fifty_moves > 50 then Some Draw
+                  if threefold_repetitions game then
+                    let () =
+                      Format.fprintf Format.std_formatter
+                        "More than 3 repetitions.@ "
+                    in
+                    Some Draw
+                  else if game.fifty_moves > 50 then
+                    let () =
+                      Format.fprintf Format.std_formatter
+                        "More than 50 moves without moving pawns or eating \
+                         enemy piece.@ "
+                    in
+                    Some Draw
                   else if
                     stalemate game.board
                       (get_current_player_from_game game)
                       (get_next_player_from_game game)
-                  then Some Draw
+                  then
+                    let () =
+                      Format.fprintf Format.std_formatter "Stalemate.@ "
+                    in
+                    Some Draw
                   else aux new_game 3)
           | None -> aux game (nbr_try - 1))
   in

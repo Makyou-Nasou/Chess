@@ -166,30 +166,25 @@ let can_move (b : board) (p : piece) (coord_start : coordinates)
                && get_piece b coord_final <> None)
   else raise Invalide_coordinates
 
+let set_piece board (line, column) piece =
+  Array.set (Array.get board line) column piece
+
 (*Removes the piece from the starting coordinate.
    Puts the deleted piece on the new coordinate*)
 let move_from_coord_to_coord (b : board) (coord_start : coordinates)
     (coord_final : coordinates) =
   assert (is_valide_coordinates coord_start && is_valide_coordinates coord_final);
-  match (coord_start, coord_final) with
-  | ( (start_line_number, start_column_number),
-      (final_line_number, final_column_number) ) ->
-      let piece = get_piece b (start_line_number, start_column_number) in
-      let start_line = Array.get b start_line_number in
-      let () = Array.set start_line start_column_number None in
-      let final_line =
-        if start_line_number = final_line_number then start_line
-        else Array.get b final_line_number
-      in
-      Array.set final_line final_column_number
-        (match piece with
-        | None -> None
-        | Some piece -> (
-            match piece.shape with
-            | King _ -> Some { piece with shape = King false }
-            | Rook _ -> Some { piece with shape = Rook false }
-            | Pawn _ -> Some { piece with shape = Pawn false }
-            | _ -> Some piece))
+  let piece = get_piece b coord_start in
+  let () = set_piece b coord_start None in
+  set_piece b coord_final
+    (match piece with
+    | None -> None
+    | Some piece -> (
+        match piece.shape with
+        | King _ -> Some { piece with shape = King false }
+        | Rook _ -> Some { piece with shape = Rook false }
+        | Pawn _ -> Some { piece with shape = Pawn false }
+        | _ -> Some piece))
 
 let delete_piece (b : board) ((cl, cc) : coordinates) =
   assert (is_valide_coordinates (cl, cc));
@@ -328,6 +323,17 @@ let chess_mate (b : board) (c : color) =
         && attacked_coord_by_enemy b (line + 1, column - 1) c)
   | None -> None
 
+let need_promotion b current_player (coord_final_line, coord_final_column) =
+  match get_piece b (coord_final_line, coord_final_column) with
+  | Some { shape = Pawn _; color = c } ->
+      get_color_from_player current_player = c
+      && ((coord_final_line = 0 && c = White)
+         || (coord_final_line = 7 && c = Black))
+  | _ -> false
+
+let get_value_of_board b : piece option array array =
+  Array.init 8 (fun i -> Array.copy (Array.get b i))
+
 let play_move (b : board) (current_player : player) (m : move)
     (next_player : player) =
   let current_player_color = get_color_from_player current_player in
@@ -352,6 +358,18 @@ let play_move (b : board) (current_player : player) (m : move)
                   let are_chess = chess b current_player_color in
                   are_chess = Some true || are_chess = None
                 then false
+                else if need_promotion b current_player coord_final then
+                  let () =
+                    set_piece b coord_final
+                      (Some
+                         {
+                           shape =
+                             (get_choose_promotion current_player)
+                               (get_value_of_board b);
+                           color = current_player_color;
+                         })
+                  in
+                  true
                 else true
               else
                 match try_passant b piece m next_player with
@@ -418,9 +436,6 @@ let play_move (b : board) (current_player : player) (m : move)
       | _, _ -> false)
   | _ -> false
 
-let get_value_of_board b : piece option array array =
-  Array.init 8 (fun i -> Array.copy (Array.get b i))
-
 let adjacent_possibles_move (piece : piece) ((l, c) : coordinates) =
   List.filter
     (fun c -> is_valide_coordinates c)
@@ -476,3 +491,5 @@ let stalemate b current_player next_player =
       | None -> aux l (c + 1)
   in
   aux 0 0
+
+let equals_boards (b1 : board) (b2 : piece option array array) = b1 = b2
