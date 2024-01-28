@@ -2,7 +2,7 @@ open Piece
 open Global
 open Player
 
-type board = piece option array array
+type board = { board : piece option list list; last_move : move option }
 
 let get_starter_piece ((line, column) : coordinates) =
   assert (is_valide_coordinates (line, column));
@@ -27,10 +27,14 @@ let get_starter_piece ((line, column) : coordinates) =
       | Some c, Some s -> Some { shape = s; color = c })
 
 let init_board () =
-  Array.init 8 (fun line ->
-      Array.init 8 (fun column -> get_starter_piece (line, column)))
+  {
+    board =
+      List.init 8 (fun line ->
+          List.init 8 (fun column -> get_starter_piece (line, column)));
+    last_move = None;
+  }
 
-let pp_board fmt board =
+let pp_board fmt b =
   let () =
     Format.fprintf fmt
       " | a | b | c | d | e | f | g | h@.――――――――――――――――――――――――――――――――――@."
@@ -39,7 +43,7 @@ let pp_board fmt board =
     let rec aux_print_line column_number =
       if column_number <= 7 then (
         Format.fprintf fmt "| ";
-        let p = Array.get (Array.get board line_number) column_number in
+        let p = List.nth (List.nth b.board line_number) column_number in
         match p with
         | None ->
             Format.fprintf fmt " ";
@@ -62,10 +66,27 @@ let pp_board fmt board =
   in
   print_board 0
 
+let get_board_from_board b = b.board
+
 let get_piece (b : board) (c : coordinates) =
   if is_valide_coordinates c then
-    match c with x, y -> Array.get (Array.get b x) y
+    match c with x, y -> List.nth (List.nth b.board x) y
   else raise Invalide_coordinates
+
+let set_piece (b : board) (line, column) piece =
+  {
+    board =
+      List.mapi
+        (fun i current_line ->
+          if i = line then
+            List.mapi
+              (fun j current_column ->
+                if j = column then piece else current_column)
+              current_line
+          else current_line)
+        b.board;
+    last_move = b.last_move;
+  }
 
 (*We don’t check whether the starting box or the arriving box are empty.
    We just look at whether the intermediate boxes are empty.*)
@@ -166,16 +187,13 @@ let can_move (b : board) (p : piece) (coord_start : coordinates)
                && get_piece b coord_final <> None)
   else raise Invalide_coordinates
 
-let set_piece board (line, column) piece =
-  Array.set (Array.get board line) column piece
-
 (*Removes the piece from the starting coordinate.
    Puts the deleted piece on the new coordinate*)
 let move_from_coord_to_coord (b : board) (coord_start : coordinates)
     (coord_final : coordinates) =
   assert (is_valide_coordinates coord_start && is_valide_coordinates coord_final);
   let piece = get_piece b coord_start in
-  let () = set_piece b coord_start None in
+  let b = set_piece b coord_start None in
   set_piece b coord_final
     (match piece with
     | None -> None
@@ -186,10 +204,6 @@ let move_from_coord_to_coord (b : board) (coord_start : coordinates)
         | Pawn _ -> Some { piece with shape = Pawn false }
         | _ -> Some piece))
 
-let delete_piece (b : board) ((cl, cc) : coordinates) =
-  assert (is_valide_coordinates (cl, cc));
-  Array.set (Array.get b cl) cc None
-
 (*p is the piece we want to move*)
 let try_passant (b : board) (p : piece) (m : move) (next_player : player) =
   match m with
@@ -199,7 +213,7 @@ let try_passant (b : board) (p : piece) (m : move) (next_player : player) =
         && is_valide_coordinates current_move_coord_final);
       match p.shape with
       | Pawn _ -> (
-          match get_last_move_from_player next_player with
+          match b.last_move with
           | Some
               (Movement
                 ( ( previous_move_coord_start_line,
@@ -245,23 +259,24 @@ let try_passant (b : board) (p : piece) (m : move) (next_player : player) =
                             = current_move_coord_final
                         in
                         if attack_good_coord_for_en_passant then
-                          let () =
-                            delete_piece b
+                          let b =
+                            set_piece b
                               ( previous_move_coord_final_line,
                                 previous_move_coord_final_column )
+                              None
                           in
-                          let () =
+                          let b =
                             move_from_coord_to_coord b current_move_coord_start
                               current_move_coord_final
                           in
-                          true
-                        else false
-                      else false
-                  | _ -> false)
-              | _ -> false)
-          | _ -> false)
-      | _ -> false)
-  | _ -> false
+                          Some b
+                        else None
+                      else None
+                  | _ -> None)
+              | _ -> None)
+          | _ -> None)
+      | _ -> None)
+  | _ -> None
 
 (*c is the colour of the person being attacked*)
 let attacked_coord_by_enemy (b : board) (coord : coordinates) (c : color) =
@@ -331,9 +346,6 @@ let need_promotion b current_player (coord_final_line, coord_final_column) =
          || (coord_final_line = 7 && c = Black))
   | _ -> false
 
-let get_value_of_board b : piece option array array =
-  Array.init 8 (fun i -> Array.copy (Array.get b i))
-
 let play_move (b : board) (current_player : player) (m : move)
     (next_player : player) =
   let current_player_color = get_color_from_player current_player in
@@ -342,7 +354,7 @@ let play_move (b : board) (current_player : player) (m : move)
       if is_valide_coordinates coord_start && is_valide_coordinates coord_final
       then
         match get_piece b coord_start with
-        | None -> false
+        | None -> None
         | Some piece ->
             if
               piece.color = current_player_color
@@ -353,34 +365,32 @@ let play_move (b : board) (current_player : player) (m : move)
                   piece_coord_final.color <> current_player_color
             then
               if can_move b piece coord_start coord_final then
-                let () = move_from_coord_to_coord b coord_start coord_final in
+                let b = move_from_coord_to_coord b coord_start coord_final in
                 if
                   let are_chess = chess b current_player_color in
                   are_chess = Some true || are_chess = None
-                then false
+                then None
                 else if need_promotion b current_player coord_final then
-                  let () =
+                  let b =
                     set_piece b coord_final
                       (Some
                          {
-                           shape =
-                             (get_choose_promotion current_player)
-                               (get_value_of_board b);
+                           shape = (get_choose_promotion current_player) b.board;
                            color = current_player_color;
                          })
                   in
-                  true
-                else true
+                  Some { b with last_move = Some m }
+                else Some { b with last_move = Some m }
               else
                 match try_passant b piece m next_player with
-                | true ->
+                | Some b ->
                     if
                       let are_chess = chess b current_player_color in
                       are_chess = Some true || are_chess = None
-                    then false
-                    else true
-                | false -> false
-            else true
+                    then None
+                    else Some { b with last_move = Some m }
+                | None -> None
+            else Some { b with last_move = Some m }
       else raise Invalide_coordinates
   | Big_Castling -> (
       let coord_king =
@@ -399,15 +409,15 @@ let play_move (b : board) (current_player : player) (m : move)
             let new_coord_rook =
               if current_player_color = Black then (0, 3) else (7, 3)
             in
-            let () = move_from_coord_to_coord b coord_king new_coord_king in
-            let () = move_from_coord_to_coord b coord_rook new_coord_rook in
+            let b = move_from_coord_to_coord b coord_king new_coord_king in
+            let b = move_from_coord_to_coord b coord_rook new_coord_rook in
             if
               let are_chess = chess b current_player_color in
               are_chess = Some true || are_chess = None
-            then false
-            else true
-          else false
-      | _, _ -> false)
+            then None
+            else Some { b with last_move = Some Big_Castling }
+          else None
+      | _, _ -> None)
   | Small_Castling -> (
       let coord_king =
         if current_player_color = Black then (0, 4) else (7, 4)
@@ -425,16 +435,16 @@ let play_move (b : board) (current_player : player) (m : move)
             let new_coord_rook =
               if current_player_color = Black then (0, 5) else (7, 5)
             in
-            let () = move_from_coord_to_coord b coord_king new_coord_king in
-            let () = move_from_coord_to_coord b coord_rook new_coord_rook in
+            let b = move_from_coord_to_coord b coord_king new_coord_king in
+            let b = move_from_coord_to_coord b coord_rook new_coord_rook in
             if
               let are_chess = chess b current_player_color in
               are_chess = Some true || are_chess = None
-            then false
-            else true
-          else false
-      | _, _ -> false)
-  | _ -> false
+            then None
+            else Some { b with last_move = Some Small_Castling }
+          else None
+      | _, _ -> None)
+  | _ -> None
 
 let adjacent_possibles_move (piece : piece) ((l, c) : coordinates) =
   List.filter
@@ -466,8 +476,7 @@ let adjacent_possibles_move (piece : piece) ((l, c) : coordinates) =
           (l, c - 1);
         ])
 
-let stalemate b current_player next_player =
-  let b = get_value_of_board b in
+let stalemate (b : board) current_player next_player =
   let rec aux l c =
     if l > 7 then true
     else if c > 7 then aux (l + 1) 0
@@ -483,8 +492,8 @@ let stalemate b current_player next_player =
                     (Movement ((l, c), coord))
                     next_player
                 with
-                | true -> false
-                | false -> true)
+                | Some _ -> false
+                | None -> true)
               (adjacent_possibles_move current_piece (l, c))
           then false
           else aux l (c + 1)
@@ -492,4 +501,4 @@ let stalemate b current_player next_player =
   in
   aux 0 0
 
-let equals_boards (b1 : board) (b2 : piece option array array) = b1 = b2
+let equals_boards (b1 : board) (b2 : piece option list list) = b1.board = b2

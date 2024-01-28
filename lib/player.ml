@@ -2,17 +2,15 @@ open Global
 open Piece
 
 type strategy = {
-  choose_move : piece option array array -> move;
-  choose_accept_draw : piece option array array -> bool;
-  choose_promotion : piece option array array -> shape;
+  choose_move : piece option list list -> move;
+  choose_accept_draw : piece option list list -> bool;
+  choose_promotion : piece option list list -> shape;
 }
 
-type player = { color : color; last_move : move option; strategy : strategy }
+type player = { color : color; strategy : strategy }
 
-let set_last_move_to_player p m = { p with last_move = Some m }
-let init_player color strategy = { color; last_move = None; strategy }
+let init_player color strategy = { color; strategy }
 let get_color_from_player (p : player) = p.color
-let get_last_move_from_player (p : player) = p.last_move
 let get_choose_move_from_player (p : player) = p.strategy.choose_move
 let get_choose_accept_draw (p : player) = p.strategy.choose_accept_draw
 let get_choose_promotion (p : player) = p.strategy.choose_promotion

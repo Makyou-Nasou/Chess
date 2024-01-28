@@ -8,7 +8,7 @@ type game = {
   players : player list;
   board : board;
   fifty_moves : int;
-  previous_position : piece option array array list;
+  previous_position : piece option list list list;
 }
 
 let pp_game fmt game = pp_board fmt game.board
@@ -33,15 +33,6 @@ let get_next_player_from_game g =
 
 let get_board_from_game g = g.board
 
-let set_move_played g m =
-  {
-    g with
-    players =
-      List.init 2 (fun i ->
-          let p = List.nth g.players i in
-          if i = g.current_player_indice then set_last_move_to_player p m else p);
-  }
-
 let play_move (g : game) (m : move) =
   let current_player = get_current_player_from_game g in
   let fifty_rule =
@@ -59,19 +50,19 @@ let play_move (g : game) (m : move) =
   match
     Board.play_move g.board current_player m (get_next_player_from_game g)
   with
-  | false -> None
-  | true ->
+  | None -> None
+  | Some b ->
       let g =
         {
           g with
-          previous_position = get_value_of_board g.board :: g.previous_position;
+          board = b;
+          previous_position =
+            get_board_from_board g.board :: g.previous_position;
         }
       in
       Some
-        (set_move_played
-           (if fifty_rule then { g with fifty_moves = 0 }
-            else { g with fifty_moves = g.fifty_moves + 1 })
-           m)
+        (if fifty_rule then { g with fifty_moves = 0 }
+         else { g with fifty_moves = g.fifty_moves + 1 })
 
 exception No_King
 
@@ -115,7 +106,7 @@ let start_game strategy_white strategy_black =
       in
       let mv =
         (get_choose_move_from_player current_player)
-          (get_value_of_board game.board)
+          (get_board_from_board game.board)
       in
       match mv with
       | Give_Up ->
@@ -130,14 +121,14 @@ let start_game strategy_white strategy_black =
           in
           if
             (get_choose_accept_draw (get_next_player_from_game game))
-              (get_value_of_board game.board)
+              (get_board_from_board game.board)
           then Some Draw
           else aux game (nbr_try - 1)
       | mv -> (
           match play_move game mv with
           | Some game -> (
-              let new_game = set_next_player_from_game game in
-              match try end_of_game new_game with No_King -> None with
+              let game = set_next_player_from_game game in
+              match try end_of_game game with No_King -> None with
               | Some t -> Some (Winner t)
               | None ->
                   if threefold_repetitions game then
@@ -162,7 +153,7 @@ let start_game strategy_white strategy_black =
                       Format.fprintf Format.std_formatter "Stalemate.@ "
                     in
                     Some Draw
-                  else aux new_game 3)
+                  else aux game 3)
           | None -> aux game (nbr_try - 1))
   in
   aux (init_game strategy_white strategy_black) 3
