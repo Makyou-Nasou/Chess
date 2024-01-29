@@ -223,15 +223,15 @@ let move_from_coord_to_coord (b : board) (coord_start : coordinates)
   assert (is_valid_coordinates coord_start && is_valid_coordinates coord_final);
   let piece = get_piece b coord_start in
   let b = set_piece b coord_start None in
-  set_piece b coord_final
-    (match piece with
-    | None -> None
-    | Some piece -> (
-        match piece.shape with
-        | King _ -> Some { piece with shape = King false }
-        | Rook _ -> Some { piece with shape = Rook false }
-        | Pawn _ -> Some { piece with shape = Pawn false }
-        | _ -> Some piece))
+  Option.map
+    (fun piece ->
+      match piece.shape with
+      | King _ -> { piece with shape = King false }
+      | Rook _ -> { piece with shape = Rook false }
+      | Pawn _ -> { piece with shape = Pawn false }
+      | _ -> piece)
+    piece
+  |> set_piece b coord_final
 
 (*p is the piece we want to move*)
 let try_passant (b : board) (p : piece) (m : move) (next_player : player) =
