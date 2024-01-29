@@ -1,4 +1,2 @@
 (library
- (name chess)
- (preprocess
-  (pps ppx_deriving.eq)))
+ (name chess))
