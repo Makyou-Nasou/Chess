@@ -352,27 +352,20 @@ let chess (b : board) (c : color) : bool =
 
 (*Check if player c has lost*)
 let chess_mate (b : board) (c : color) : bool =
-  match find_king b c with
-  | line, column -> (
-      (try attacked_coord_by_enemy b (line, column) c
-       with Invalid_coordinates -> true)
-      && (try attacked_coord_by_enemy b (line + 1, column) c
-          with Invalid_coordinates -> true)
-      && (try attacked_coord_by_enemy b (line + 1, column + 1) c
-          with Invalid_coordinates -> true)
-      && (try attacked_coord_by_enemy b (line, column + 1) c
-          with Invalid_coordinates -> true)
-      && (try attacked_coord_by_enemy b (line - 1, column + 1) c
-          with Invalid_coordinates -> true)
-      && (try attacked_coord_by_enemy b (line - 1, column) c
-          with Invalid_coordinates -> true)
-      && (try attacked_coord_by_enemy b (line - 1, column - 1) c
-          with Invalid_coordinates -> true)
-      && (try attacked_coord_by_enemy b (line, column - 1) c
-          with Invalid_coordinates -> true)
-      &&
-      try attacked_coord_by_enemy b (line + 1, column - 1) c
-      with Invalid_coordinates -> true)
+  let try_or_true (line, column) =
+    try attacked_coord_by_enemy b (line, column) c
+    with Invalid_coordinates -> true
+  in
+  let line, column = find_king b c in
+  try_or_true (line, column)
+  && try_or_true (line + 1, column)
+  && try_or_true (line + 1, column + 1)
+  && try_or_true (line, column + 1)
+  && try_or_true (line - 1, column + 1)
+  && try_or_true (line - 1, column)
+  && try_or_true (line - 1, column - 1)
+  && try_or_true (line, column - 1)
+  && try_or_true (line + 1, column - 1)
 
 let need_promotion b current_player (coord_final_line, coord_final_column) =
   match get_piece b (coord_final_line, coord_final_column) with
