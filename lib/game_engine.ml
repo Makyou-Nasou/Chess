@@ -47,22 +47,16 @@ let play_move (g : game) (m : move) =
         | None -> false)
     | _ -> false
   in
-  match
-    Board.play_move g.board current_player m (get_next_player_from_game g)
-  with
-  | None -> None
-  | Some b ->
-      let g =
-        {
-          g with
-          board = b;
-          previous_position =
-            get_board_from_board g.board :: g.previous_position;
-        }
-      in
-      Some
-        (if fifty_rule then { g with fifty_moves = 0 }
-         else { g with fifty_moves = g.fifty_moves + 1 })
+  Board.play_move g.board current_player m (get_next_player_from_game g)
+  |> Option.map (fun b ->
+         let fifty_moves = if fifty_rule then 0 else g.fifty_moves + 1 in
+         {
+           g with
+           fifty_moves;
+           board = b;
+           previous_position =
+             get_board_from_board g.board :: g.previous_position;
+         })
 
 exception No_King
 

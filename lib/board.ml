@@ -223,15 +223,15 @@ let move_from_coord_to_coord (b : board) (coord_start : coordinates)
   assert (is_valid_coordinates coord_start && is_valid_coordinates coord_final);
   let piece = get_piece b coord_start in
   let b = set_piece b coord_start None in
-  set_piece b coord_final
-    (match piece with
-    | None -> None
-    | Some piece -> (
-        match piece.shape with
-        | King _ -> Some { piece with shape = King false }
-        | Rook _ -> Some { piece with shape = Rook false }
-        | Pawn _ -> Some { piece with shape = Pawn false }
-        | _ -> Some piece))
+  Option.map
+    (fun piece ->
+      match piece.shape with
+      | King _ -> { piece with shape = King false }
+      | Rook _ -> { piece with shape = Rook false }
+      | Pawn _ -> { piece with shape = Pawn false }
+      | _ -> piece)
+    piece
+  |> set_piece b coord_final
 
 (*p is the piece we want to move*)
 let try_passant (b : board) (p : piece) (m : move) (next_player : player) =
@@ -343,10 +343,9 @@ let chess (b : board) (c : color) : bool option =
           if line > 7 then None else aux line 0
         else aux line column
   in
-  let king_coord = aux 0 0 in
-  match king_coord with
-  | Some (line, column) -> Some (attacked_coord_by_enemy b (line, column) c)
-  | None -> None
+  aux 0 0
+  |> Option.map (fun (line, column) ->
+         attacked_coord_by_enemy b (line, column) c)
 
 (*Check if player c has lost*)
 let chess_mate (b : board) (c : color) =
@@ -360,11 +359,9 @@ let chess_mate (b : board) (c : color) =
           if line > 7 then None else aux line 0
         else aux line column
   in
-  let king_coord = aux 0 0 in
-  match king_coord with
-  | Some (line, column) ->
-      Some
-        (try attacked_coord_by_enemy b (line, column) c
+  aux 0 0
+  |> Option.map (fun (line, column) ->
+         try attacked_coord_by_enemy b (line, column) c
          with Invalid_coordinates -> (
            true
            &&
@@ -398,7 +395,6 @@ let chess_mate (b : board) (c : color) =
                          &&
                          try attacked_coord_by_enemy b (line + 1, column - 1) c
                          with Invalid_coordinates -> true)))))))))
-  | None -> None
 
 let need_promotion b current_player (coord_final_line, coord_final_column) =
   match get_piece b (coord_final_line, coord_final_column) with
