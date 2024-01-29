@@ -440,7 +440,7 @@ let play_move (b : board) (current_player : player) (m : move)
                     set_piece b coord_final
                       (Some
                          {
-                           shape = (get_choose_promotion current_player) b.board;
+                           shape = (match (get_choose_promotion current_player) b.board with |Rook true -> Rook false | s -> s);
                            color = current_player_color;
                          })
                   in
