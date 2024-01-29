@@ -12,4 +12,4 @@ type move =
   | Give_Up
 
 type color = Black | White
-type results = Winner of color | Draw
+type results = Winner of color | Draw | Error of string

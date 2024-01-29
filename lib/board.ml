@@ -331,70 +331,48 @@ let attacked_coord_by_enemy (b : board) (coord : coordinates) (c : color) =
     let () = Format.printf "5@ " in
     raise Invalid_coordinates
 
-(*Check if the player c is losing or not*)
-let chess (b : board) (c : color) : bool option =
+exception No_King
+
+let find_king (b : board) (c : color) : coordinates =
   let rec aux line column =
     match get_piece b (line, column) with
-    | Some { shape = King _; color } when color = c -> Some (line, column)
+    | Some { shape = King _; color } when color = c -> (line, column)
     | _ ->
         let column = column + 1 in
         if column > 7 then
           let line = line + 1 in
-          if line > 7 then None else aux line 0
+          if line > 7 then raise No_King else aux line 0
         else aux line column
   in
   aux 0 0
-  |> Option.map (fun (line, column) ->
-         attacked_coord_by_enemy b (line, column) c)
+
+(*Check if the player c is losing or not*)
+let chess (b : board) (c : color) : bool =
+  attacked_coord_by_enemy b (find_king b c) c
 
 (*Check if player c has lost*)
-let chess_mate (b : board) (c : color) =
-  let rec aux line column =
-    match get_piece b (line, column) with
-    | Some { shape = King _; color } when color = c -> Some (line, column)
-    | _ ->
-        let column = column + 1 in
-        if column > 7 then
-          let line = line + 1 in
-          if line > 7 then None else aux line 0
-        else aux line column
-  in
-  aux 0 0
-  |> Option.map (fun (line, column) ->
-         try attacked_coord_by_enemy b (line, column) c
-         with Invalid_coordinates -> (
-           true
-           &&
-           try attacked_coord_by_enemy b (line + 1, column) c
-           with Invalid_coordinates -> (
-             true
-             &&
-             try attacked_coord_by_enemy b (line + 1, column + 1) c
-             with Invalid_coordinates -> (
-               true
-               &&
-               try attacked_coord_by_enemy b (line, column + 1) c
-               with Invalid_coordinates -> (
-                 true
-                 &&
-                 try attacked_coord_by_enemy b (line - 1, column + 1) c
-                 with Invalid_coordinates -> (
-                   true
-                   &&
-                   try attacked_coord_by_enemy b (line - 1, column) c
-                   with Invalid_coordinates -> (
-                     true
-                     &&
-                     try attacked_coord_by_enemy b (line - 1, column - 1) c
-                     with Invalid_coordinates -> (
-                       true
-                       &&
-                       try attacked_coord_by_enemy b (line, column - 1) c
-                       with Invalid_coordinates -> (
-                         true
-                         &&
-                         try attacked_coord_by_enemy b (line + 1, column - 1) c
-                         with Invalid_coordinates -> true)))))))))
+let chess_mate (b : board) (c : color) : bool =
+  match find_king b c with
+  | line, column -> (
+      (try attacked_coord_by_enemy b (line, column) c
+       with Invalid_coordinates -> true)
+      && (try attacked_coord_by_enemy b (line + 1, column) c
+          with Invalid_coordinates -> true)
+      && (try attacked_coord_by_enemy b (line + 1, column + 1) c
+          with Invalid_coordinates -> true)
+      && (try attacked_coord_by_enemy b (line, column + 1) c
+          with Invalid_coordinates -> true)
+      && (try attacked_coord_by_enemy b (line - 1, column + 1) c
+          with Invalid_coordinates -> true)
+      && (try attacked_coord_by_enemy b (line - 1, column) c
+          with Invalid_coordinates -> true)
+      && (try attacked_coord_by_enemy b (line - 1, column - 1) c
+          with Invalid_coordinates -> true)
+      && (try attacked_coord_by_enemy b (line, column - 1) c
+          with Invalid_coordinates -> true)
+      &&
+      try attacked_coord_by_enemy b (line + 1, column - 1) c
+      with Invalid_coordinates -> true)
 
 let need_promotion b current_player (coord_final_line, coord_final_column) =
   match get_piece b (coord_final_line, coord_final_column) with
@@ -427,16 +405,18 @@ let play_move (b : board) (current_player : player) (m : move)
             then
               if can_move b piece coord_start coord_final then
                 let b = move_from_coord_to_coord b coord_start coord_final in
-                if
-                  let are_chess = chess b current_player_color in
-                  are_chess = Some true || are_chess = None
-                then None
+                if chess b current_player_color then None
                 else if need_promotion b current_player coord_final then
                   let b =
                     set_piece b coord_final
                       (Some
                          {
-                           shape = (match (get_choose_promotion current_player) b.board with |Rook true -> Rook false | s -> s);
+                           shape =
+                             (match
+                                (get_choose_promotion current_player) b.board
+                              with
+                             | Rook true -> Rook false
+                             | s -> s);
                            color = current_player_color;
                          })
                   in
@@ -459,10 +439,7 @@ let play_move (b : board) (current_player : player) (m : move)
               else
                 match try_passant b piece m next_player with
                 | Some b ->
-                    if
-                      let are_chess = chess b current_player_color in
-                      are_chess = Some true || are_chess = None
-                    then None
+                    if chess b current_player_color then None
                     else Some { b with last_move = Some m }
                 | None -> None
             else None
@@ -488,10 +465,7 @@ let play_move (b : board) (current_player : player) (m : move)
             in
             let b = move_from_coord_to_coord b coord_king new_coord_king in
             let b = move_from_coord_to_coord b coord_rook new_coord_rook in
-            if
-              let are_chess = chess b current_player_color in
-              are_chess = Some true || are_chess = None
-            then None
+            if chess b current_player_color then None
             else Some { b with last_move = Some Big_Castling }
           else None
       | _, _ -> None)
@@ -514,10 +488,7 @@ let play_move (b : board) (current_player : player) (m : move)
             in
             let b = move_from_coord_to_coord b coord_king new_coord_king in
             let b = move_from_coord_to_coord b coord_rook new_coord_rook in
-            if
-              let are_chess = chess b current_player_color in
-              are_chess = Some true || are_chess = None
-            then None
+            if chess b current_player_color then None
             else Some { b with last_move = Some Small_Castling }
           else None
       | _, _ -> None)

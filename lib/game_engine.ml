@@ -58,23 +58,13 @@ let play_move (g : game) (m : move) =
              get_board_from_board g.board :: g.previous_position;
          })
 
-exception No_King
-
 let end_of_game game =
   match chess_mate game.board White with
-  | Some true -> Some White
-  | Some false -> (
+  | true -> Some White
+  | false -> (
       match chess_mate game.board Black with
-      | Some true -> Some Black
-      | Some false -> None
-      | None ->
-          let () =
-            Format.fprintf Format.std_formatter "No king on the board. "
-          in
-          raise No_King)
-  | None ->
-      let () = Format.fprintf Format.std_formatter "No king on the board. " in
-      raise No_King
+      | true -> Some Black
+      | false -> None)
 
 let threefold_repetitions g =
   List.fold_left
@@ -83,13 +73,14 @@ let threefold_repetitions g =
   >= 3
 
 let start_game strategy_white strategy_black =
+  Random.self_init ();
   let rec aux game nbr_try =
     if nbr_try = 0 then
       let () = pp_game Format.std_formatter game in
       let () =
         Format.fprintf Format.std_formatter "You have tried 3 attempts ...@ "
       in
-      Some (Winner (get_color_from_player (get_next_player_from_game game)))
+      Winner (get_color_from_player (get_next_player_from_game game))
     else
       let () = pp_game Format.std_formatter game in
       let current_player = get_current_player_from_game game in
@@ -106,7 +97,7 @@ let start_game strategy_white strategy_black =
       match mv with
       | Give_Up ->
           let () = pp_game Format.std_formatter game in
-          Some (Winner (get_color_from_player (get_next_player_from_game game)))
+          Winner (get_color_from_player (get_next_player_from_game game))
       | Propose_Draw ->
           let () =
             Format.fprintf Format.std_formatter
@@ -120,7 +111,7 @@ let start_game strategy_white strategy_black =
               (get_board_from_board game.board)
           then
             let () = pp_game Format.std_formatter game in
-            Some Draw
+            Draw
           else aux game (nbr_try - 1)
       | mv -> (
           match play_move game mv with
@@ -129,7 +120,7 @@ let start_game strategy_white strategy_black =
               match try end_of_game game with No_King -> None with
               | Some t ->
                   let () = pp_game Format.std_formatter game in
-                  Some (Winner t)
+                  Winner t
               | None ->
                   if threefold_repetitions game then
                     let () = pp_game Format.std_formatter game in
@@ -137,7 +128,7 @@ let start_game strategy_white strategy_black =
                       Format.fprintf Format.std_formatter
                         "More than 3 repetitions.@ "
                     in
-                    Some Draw
+                    Draw
                   else if game.fifty_moves > 50 then
                     let () = pp_game Format.std_formatter game in
                     let () =
@@ -145,7 +136,7 @@ let start_game strategy_white strategy_black =
                         "More than 50 moves without moving pawns or eating \
                          enemy piece.@ "
                     in
-                    Some Draw
+                    Draw
                   else if
                     stalemate game.board
                       (get_current_player_from_game game)
@@ -155,8 +146,9 @@ let start_game strategy_white strategy_black =
                     let () =
                       Format.fprintf Format.std_formatter "Stalemate.@ "
                     in
-                    Some Draw
+                    Draw
                   else aux game 3)
           | None -> aux game (nbr_try - 1))
   in
-  aux (init_game strategy_white strategy_black) 3
+  try aux (init_game strategy_white strategy_black) 3
+  with No_King -> Error "No king on the board."
