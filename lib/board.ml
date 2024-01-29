@@ -343,10 +343,9 @@ let chess (b : board) (c : color) : bool option =
           if line > 7 then None else aux line 0
         else aux line column
   in
-  let king_coord = aux 0 0 in
-  match king_coord with
-  | Some (line, column) -> Some (attacked_coord_by_enemy b (line, column) c)
-  | None -> None
+  aux 0 0
+  |> Option.map (fun (line, column) ->
+         attacked_coord_by_enemy b (line, column) c)
 
 (*Check if player c has lost*)
 let chess_mate (b : board) (c : color) =
