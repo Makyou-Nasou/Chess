@@ -39,8 +39,8 @@ let rec request_action question =
         else
           let (x1, y1), (x2, y2) = convert_coordinates s in
           if
-            (not (is_valide_coordinates (x1, y1)))
-            || not (is_valide_coordinates (x2, y2))
+            (not (is_valid_coordinates (x1, y1)))
+            || not (is_valid_coordinates (x2, y2))
           then (
             Format.printf "Invalid entry.@;";
             request_action question)

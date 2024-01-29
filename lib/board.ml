@@ -9,7 +9,7 @@ type board = {
 }
 
 let get_starter_piece ((line, column) : coordinates) =
-  assert (is_valide_coordinates (line, column));
+  assert (is_valid_coordinates (line, column));
   match line with
   | 1 -> Some { shape = Pawn true; color = Black }
   | 6 -> Some { shape = Pawn true; color = White }
@@ -90,11 +90,11 @@ let pp_board fmt b =
 let get_board_from_board b = b.board
 
 let get_piece (b : board) (c : coordinates) =
-  if is_valide_coordinates c then
+  if is_valid_coordinates c then
     match c with x, y -> List.nth (List.nth b.board x) y
   else
     let () = Format.printf "1@ " in
-    raise Invalide_coordinates
+    raise Invalid_coordinates
 
 let set_piece (b : board) (line, column) piece =
   {
@@ -115,7 +115,7 @@ let set_piece (b : board) (line, column) piece =
    We just look at whether the intermediate boxes are empty.*)
 let empty_straight (b : board) (coord_start : coordinates)
     (coord_final : coordinates) =
-  if is_valide_coordinates coord_start && is_valide_coordinates coord_final then
+  if is_valid_coordinates coord_start && is_valid_coordinates coord_final then
     match (coord_start, coord_final) with
     | ( (coord_start_line, coord_start_column),
         (coord_final_line, coord_final_column) ) ->
@@ -143,13 +143,13 @@ let empty_straight (b : board) (coord_start : coordinates)
           aux (coord_start_line + dir_line, coord_start_column + dir_column)
   else
     let () = Format.printf "2@ " in
-    raise Invalide_coordinates
+    raise Invalid_coordinates
 
 (*We don’t check whether the starting box or the arriving box are empty.
    We just look at whether the intermediate boxes are empty.*)
 let empty_diagonal (b : board) (coord_start : coordinates)
     (coord_final : coordinates) =
-  if is_valide_coordinates coord_start && is_valide_coordinates coord_final then
+  if is_valid_coordinates coord_start && is_valid_coordinates coord_final then
     match (coord_start, coord_final) with
     | ( (coord_start_line, coord_start_column),
         (coord_final_line, coord_final_column) ) ->
@@ -172,13 +172,13 @@ let empty_diagonal (b : board) (coord_start : coordinates)
           aux (coord_start_line + dir_line, coord_start_column + dir_column)
   else
     let () = Format.printf "3@ " in
-    raise Invalide_coordinates
+    raise Invalid_coordinates
 
 (*We assume that the arrival box is empty or occupied by an enemy.
    That the starting box is occupied by the piece given as an argument.*)
 let can_move (b : board) (p : piece) (coord_start : coordinates)
     (coord_final : coordinates) =
-  if is_valide_coordinates coord_start && is_valide_coordinates coord_final then
+  if is_valid_coordinates coord_start && is_valid_coordinates coord_final then
     match (coord_start, coord_final) with
     | ( (coord_start_line, coord_start_column),
         (coord_final_line, coord_final_column) ) -> (
@@ -214,13 +214,13 @@ let can_move (b : board) (p : piece) (coord_start : coordinates)
                && get_piece b coord_final <> None)
   else
     let () = Format.printf "4@ " in
-    raise Invalide_coordinates
+    raise Invalid_coordinates
 
 (*Removes the piece from the starting coordinate.
    Puts the deleted piece on the new coordinate*)
 let move_from_coord_to_coord (b : board) (coord_start : coordinates)
     (coord_final : coordinates) =
-  assert (is_valide_coordinates coord_start && is_valide_coordinates coord_final);
+  assert (is_valid_coordinates coord_start && is_valid_coordinates coord_final);
   let piece = get_piece b coord_start in
   let b = set_piece b coord_start None in
   set_piece b coord_final
@@ -238,8 +238,8 @@ let try_passant (b : board) (p : piece) (m : move) (next_player : player) =
   match m with
   | Movement (current_move_coord_start, current_move_coord_final) -> (
       assert (
-        is_valide_coordinates current_move_coord_start
-        && is_valide_coordinates current_move_coord_final);
+        is_valid_coordinates current_move_coord_start
+        && is_valid_coordinates current_move_coord_final);
       match p.shape with
       | Pawn _ -> (
           match b.last_move with
@@ -250,10 +250,10 @@ let try_passant (b : board) (p : piece) (m : move) (next_player : player) =
                   ( previous_move_coord_final_line,
                     previous_move_coord_final_column ) )) -> (
               assert (
-                is_valide_coordinates
+                is_valid_coordinates
                   ( previous_move_coord_start_line,
                     previous_move_coord_start_column )
-                && is_valide_coordinates
+                && is_valid_coordinates
                      ( previous_move_coord_final_line,
                        previous_move_coord_final_column ));
               match
@@ -313,9 +313,9 @@ let try_passant (b : board) (p : piece) (m : move) (next_player : player) =
       | _ -> None)
   | _ -> None
 
-(*c is the colour of the person being attacked*)
+(*c is the color of the person being attacked*)
 let attacked_coord_by_enemy (b : board) (coord : coordinates) (c : color) =
-  if is_valide_coordinates coord then
+  if is_valid_coordinates coord then
     let rec aux i j =
       if i > 7 then false
       else if j > 7 then aux (i + 1) 0
@@ -329,7 +329,7 @@ let attacked_coord_by_enemy (b : board) (coord : coordinates) (c : color) =
     aux 0 0
   else
     let () = Format.printf "5@ " in
-    raise Invalide_coordinates
+    raise Invalid_coordinates
 
 (*Check if the player c is losing or not*)
 let chess (b : board) (c : color) : bool option =
@@ -365,39 +365,39 @@ let chess_mate (b : board) (c : color) =
   | Some (line, column) ->
       Some
         (try attacked_coord_by_enemy b (line, column) c
-         with Invalide_coordinates -> (
+         with Invalid_coordinates -> (
            true
            &&
            try attacked_coord_by_enemy b (line + 1, column) c
-           with Invalide_coordinates -> (
+           with Invalid_coordinates -> (
              true
              &&
              try attacked_coord_by_enemy b (line + 1, column + 1) c
-             with Invalide_coordinates -> (
+             with Invalid_coordinates -> (
                true
                &&
                try attacked_coord_by_enemy b (line, column + 1) c
-               with Invalide_coordinates -> (
+               with Invalid_coordinates -> (
                  true
                  &&
                  try attacked_coord_by_enemy b (line - 1, column + 1) c
-                 with Invalide_coordinates -> (
+                 with Invalid_coordinates -> (
                    true
                    &&
                    try attacked_coord_by_enemy b (line - 1, column) c
-                   with Invalide_coordinates -> (
+                   with Invalid_coordinates -> (
                      true
                      &&
                      try attacked_coord_by_enemy b (line - 1, column - 1) c
-                     with Invalide_coordinates -> (
+                     with Invalid_coordinates -> (
                        true
                        &&
                        try attacked_coord_by_enemy b (line, column - 1) c
-                       with Invalide_coordinates -> (
+                       with Invalid_coordinates -> (
                          true
                          &&
                          try attacked_coord_by_enemy b (line + 1, column - 1) c
-                         with Invalide_coordinates -> true)))))))))
+                         with Invalid_coordinates -> true)))))))))
   | None -> None
 
 let need_promotion b current_player (coord_final_line, coord_final_column) =
@@ -413,7 +413,7 @@ let play_move (b : board) (current_player : player) (m : move)
   let current_player_color = get_color_from_player current_player in
   match m with
   | Movement (coord_start, coord_final) ->
-      if is_valide_coordinates coord_start && is_valide_coordinates coord_final
+      if is_valid_coordinates coord_start && is_valid_coordinates coord_final
       then
         match get_piece b coord_start with
         | None -> None
@@ -472,7 +472,7 @@ let play_move (b : board) (current_player : player) (m : move)
             else None
       else
         let () = Format.printf "6@ " in
-        raise Invalide_coordinates
+        raise Invalid_coordinates
   | Big_Castling -> (
       let coord_king =
         if current_player_color = Black then (0, 4) else (7, 4)
@@ -529,7 +529,7 @@ let play_move (b : board) (current_player : player) (m : move)
 
 let adjacent_possibles_move (piece : piece) ((l, c) : coordinates) =
   List.filter
-    (fun c -> is_valide_coordinates c)
+    (fun c -> is_valid_coordinates c)
     (match piece.shape with
     | Rook _ -> [ (l + 1, c); (l, c + 1); (l - 1, c); (l, c - 1) ]
     | Horse ->

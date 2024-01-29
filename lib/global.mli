@@ -1,8 +1,8 @@
 type coordinates = int * int
 
-exception Invalide_coordinates
+exception Invalid_coordinates
 
-val is_valide_coordinates : coordinates -> bool
+val is_valid_coordinates : coordinates -> bool
 
 type move =
   | Movement of coordinates * coordinates
