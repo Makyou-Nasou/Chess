@@ -5,7 +5,7 @@
 (generate_opam_files true)
 
 (source
- (uri git+https://github.com/Makyou-Nasou/Echecs))
+ (uri git+https://github.com/ThomArr/Chess))
 
 (authors  "Thomas Arrous")
 
