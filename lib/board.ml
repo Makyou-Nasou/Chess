@@ -359,11 +359,9 @@ let chess_mate (b : board) (c : color) =
           if line > 7 then None else aux line 0
         else aux line column
   in
-  let king_coord = aux 0 0 in
-  match king_coord with
-  | Some (line, column) ->
-      Some
-        (try attacked_coord_by_enemy b (line, column) c
+  aux 0 0
+  |> Option.map (fun (line, column) ->
+         try attacked_coord_by_enemy b (line, column) c
          with Invalid_coordinates -> (
            true
            &&
@@ -397,7 +395,6 @@ let chess_mate (b : board) (c : color) =
                          &&
                          try attacked_coord_by_enemy b (line + 1, column - 1) c
                          with Invalid_coordinates -> true)))))))))
-  | None -> None
 
 let need_promotion b current_player (coord_final_line, coord_final_column) =
   match get_piece b (coord_final_line, coord_final_column) with
