@@ -2,9 +2,9 @@ open Global
 open Piece
 
 type strategy = {
-  choose_move : piece option list list -> move;
-  choose_accept_draw : piece option list list -> bool;
-  choose_promotion : piece option list list -> shape;
+  choose_move : color -> piece option list list -> move;
+  choose_accept_draw : color -> piece option list list -> bool;
+  choose_promotion : color -> piece option list list -> shape;
 }
 
 type player

@@ -2,18 +2,18 @@ open Global
 open Piece
 
 type strategy = {
-  choose_move : piece option list list -> move;
-  choose_accept_draw : piece option list list -> bool;
-  choose_promotion : piece option list list -> shape;
+  choose_move : color -> piece option list list -> move;
+  choose_accept_draw : color -> piece option list list -> bool;
+  choose_promotion : color -> piece option list list -> shape;
 }
 
 type player = { color : color; strategy : strategy }
 
 let init_player color strategy = { color; strategy }
 let get_color_from_player (p : player) = p.color
-let get_choose_move_from_player (p : player) = p.strategy.choose_move
-let get_choose_accept_draw (p : player) = p.strategy.choose_accept_draw
-let get_choose_promotion (p : player) = p.strategy.choose_promotion
+let get_choose_move_from_player (p : player) = p.strategy.choose_move p.color
+let get_choose_accept_draw (p : player) = p.strategy.choose_accept_draw p.color
+let get_choose_promotion (p : player) = p.strategy.choose_promotion p.color
 
 let convert_coordinates (coord : string) : (int * int) * (int * int) =
   let convert_char c = Char.code c - Char.code 'a' in
@@ -71,16 +71,16 @@ let rec request_piece question =
         Format.printf "Invalid entry : your answer is not correct.@;";
         request_piece question))
 
-let default_choose_move _ =
+let default_choose_move _ _ =
   request_action
     "Choose move on format : \"start finish\" (example : a2 a3) or \"bc\" for \
      big castling or \"sg\" for small castling or \"d\" to propose draw or \
      \"gu\" for give up."
 
-let default_choose_accept_draw _ =
+let default_choose_accept_draw _ _ =
   request_yes_or_no "Do you want to accept draw?"
 
-let default_choose_promotion _ =
+let default_choose_promotion _ _ =
   request_piece
     "What do you want to turn your pawn into? (Q for Queen, R for Rook, B for \
      Bishop and H for Horse)"
