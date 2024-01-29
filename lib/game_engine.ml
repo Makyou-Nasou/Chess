@@ -117,7 +117,7 @@ let start_game strategy_white strategy_black =
           match play_move game mv with
           | Some game -> (
               let game = set_next_player_from_game game in
-              match try end_of_game game with No_King -> None with
+              match end_of_game game with
               | Some t ->
                   let () = pp_game Format.std_formatter game in
                   Winner t
