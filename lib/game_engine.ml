@@ -35,6 +35,7 @@ let get_board_from_game g = g.board
 
 let play_move (g : game) (m : move) =
   let current_player = get_current_player_from_game g in
+  let current_player_color = get_color_from_player current_player in
   let fifty_rule =
     match m with
     | Movement (coord_start, coord_final) -> (
@@ -43,11 +44,11 @@ let play_move (g : game) (m : move) =
         | _ -> false)
         ||
         match get_piece g.board coord_final with
-        | Some p -> p.color <> get_color_from_player current_player
+        | Some p -> p.color <> current_player_color
         | None -> false)
     | _ -> false
   in
-  Board.play_move g.board current_player m (get_next_player_from_game g)
+  Board.play_move g.board (get_choose_promotion current_player) m
   |> Option.map (fun b ->
          let fifty_moves = if fifty_rule then 0 else g.fifty_moves + 1 in
          {
@@ -75,41 +76,36 @@ let threefold_repetitions g =
 let start_game strategy_white strategy_black =
   Random.self_init ();
   let rec aux game nbr_try =
+    let current_player = get_current_player_from_game game in
+    let next_player = get_next_player_from_game game in
     if nbr_try = 0 then
       let () = pp_game Format.std_formatter game in
       let () =
         Format.fprintf Format.std_formatter "You have tried 3 attempts ...@ "
       in
-      Winner (get_color_from_player (get_next_player_from_game game))
+      Winner (get_color_from_player next_player)
     else
       let () = pp_game Format.std_formatter game in
-      let current_player = get_current_player_from_game game in
       let () =
         Format.fprintf Format.std_formatter "It is the turn of the %s.@ "
           (match get_color_from_player current_player with
           | White -> "white"
           | Black -> "black")
       in
-      let mv =
-        (get_choose_move_from_player current_player)
-          (get_board_from_board game.board)
-      in
+      let mv = (get_choose_move_from_player current_player) game.board in
       match mv with
       | Give_Up ->
           let () = pp_game Format.std_formatter game in
-          Winner (get_color_from_player (get_next_player_from_game game))
+          Winner (get_color_from_player next_player)
       | Propose_Draw ->
           let () =
             Format.fprintf Format.std_formatter
               "%s your opponent offers you a draw.@ "
-              (match get_color_from_player (get_next_player_from_game game) with
+              (match get_color_from_player next_player with
               | White -> "White"
               | Black -> "Black")
           in
-          if
-            (get_choose_accept_draw (get_next_player_from_game game))
-              (get_board_from_board game.board)
-          then
+          if (get_choose_accept_draw next_player) game.board then
             let () = pp_game Format.std_formatter game in
             Draw
           else aux game (nbr_try - 1)
@@ -137,11 +133,7 @@ let start_game strategy_white strategy_black =
                          enemy piece.@ "
                     in
                     Draw
-                  else if
-                    stalemate game.board
-                      (get_current_player_from_game game)
-                      (get_next_player_from_game game)
-                  then
+                  else if stalemate game.board then
                     let () = pp_game Format.std_formatter game in
                     let () =
                       Format.fprintf Format.std_formatter "Stalemate.@ "

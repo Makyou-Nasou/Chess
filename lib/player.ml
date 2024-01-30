@@ -1,10 +1,11 @@
 open Global
 open Piece
+open Board
 
 type strategy = {
-  choose_move : color -> piece option list list -> move;
-  choose_accept_draw : color -> piece option list list -> bool;
-  choose_promotion : color -> piece option list list -> shape;
+  choose_move : color -> board -> move;
+  choose_accept_draw : color -> board -> bool;
+  choose_promotion : color -> board -> shape;
 }
 
 type player = { color : color; strategy : strategy }

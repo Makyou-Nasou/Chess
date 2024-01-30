@@ -2,6 +2,7 @@ type coordinates = int * int
 
 exception Invalid_coordinates
 
+(*Check if a coordinate is in the board.*)
 val is_valid_coordinates : coordinates -> bool
 
 type move =
@@ -12,4 +13,7 @@ type move =
   | Give_Up
 
 type color = Black | White
+
+val get_other_color : color -> color
+
 type results = Winner of color | Draw | Error of string

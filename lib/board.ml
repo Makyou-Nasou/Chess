@@ -1,11 +1,11 @@
 open Piece
 open Global
-open Player
 
 type board = {
   board : piece option list list;
   last_move : move option;
   dead_piece : piece option list;
+  last_player : color;
 }
 
 let get_starter_piece ((line, column) : coordinates) =
@@ -37,6 +37,7 @@ let init_board () =
           List.init 8 (fun column -> get_starter_piece (line, column)));
     last_move = None;
     dead_piece = [];
+    last_player = Black;
   }
 
 let pp_board fmt b =
@@ -88,13 +89,12 @@ let pp_board fmt b =
   else ()
 
 let get_board_from_board b = b.board
+let get_last_move_from_board b = b.last_move
 
 let get_piece (b : board) (c : coordinates) =
   if is_valid_coordinates c then
     match c with x, y -> List.nth (List.nth b.board x) y
-  else
-    let () = Format.printf "1@ " in
-    raise Invalid_coordinates
+  else raise Invalid_coordinates
 
 let set_piece (b : board) (line, column) piece =
   {
@@ -141,9 +141,7 @@ let empty_straight (b : board) (coord_start : coordinates)
                      coord_current_line_colum + dir_column )
           in
           aux (coord_start_line + dir_line, coord_start_column + dir_column)
-  else
-    let () = Format.printf "2@ " in
-    raise Invalid_coordinates
+  else raise Invalid_coordinates
 
 (*We don’t check whether the starting box or the arriving box are empty.
    We just look at whether the intermediate boxes are empty.*)
@@ -170,9 +168,7 @@ let empty_diagonal (b : board) (coord_start : coordinates)
                      coord_current_line_colum + dir_column )
           in
           aux (coord_start_line + dir_line, coord_start_column + dir_column)
-  else
-    let () = Format.printf "3@ " in
-    raise Invalid_coordinates
+  else raise Invalid_coordinates
 
 (*We assume that the arrival box is empty or occupied by an enemy.
    That the starting box is occupied by the piece given as an argument.*)
@@ -212,9 +208,7 @@ let can_move (b : board) (p : piece) (coord_start : coordinates)
                && ((distance_line = 1 && p.color = White)
                   || (distance_line = -1 && p.color = Black))
                && get_piece b coord_final <> None)
-  else
-    let () = Format.printf "4@ " in
-    raise Invalid_coordinates
+  else raise Invalid_coordinates
 
 (*Removes the piece from the starting coordinate.
    Puts the deleted piece on the new coordinate*)
@@ -234,84 +228,68 @@ let move_from_coord_to_coord (b : board) (coord_start : coordinates)
   |> set_piece b coord_final
 
 (*p is the piece we want to move*)
-let try_passant (b : board) (p : piece) (m : move) (next_player : player) =
-  match m with
-  | Movement (current_move_coord_start, current_move_coord_final) -> (
+let can_en_passant (b : board) (m : move) =
+  match (m, b.last_move) with
+  | ( Movement
+        ( (current_move_coord_start_line, current_move_coord_start_column),
+          (current_move_coord_final_line, current_move_coord_final_column) ),
+      Some
+        (Movement
+          ( (previous_move_coord_start_line, previous_move_coord_start_column),
+            (previous_move_coord_final_line, previous_move_coord_final_column)
+          )) ) -> (
       assert (
-        is_valid_coordinates current_move_coord_start
-        && is_valid_coordinates current_move_coord_final);
-      match p.shape with
-      | Pawn _ -> (
-          match b.last_move with
-          | Some
-              (Movement
-                ( ( previous_move_coord_start_line,
-                    previous_move_coord_start_column ),
-                  ( previous_move_coord_final_line,
-                    previous_move_coord_final_column ) )) -> (
-              assert (
-                is_valid_coordinates
-                  ( previous_move_coord_start_line,
-                    previous_move_coord_start_column )
-                && is_valid_coordinates
-                     ( previous_move_coord_final_line,
-                       previous_move_coord_final_column ));
-              match
-                get_piece b
-                  ( previous_move_coord_final_line,
-                    previous_move_coord_final_column )
-              with
-              | Some piece -> (
-                  match piece.shape with
-                  | Pawn _ ->
-                      let distance_line_previous_move =
-                        previous_move_coord_start_line
-                        - previous_move_coord_final_line
-                      in
-                      let distance_column_previous_move =
-                        previous_move_coord_start_column
-                        - previous_move_coord_final_column
-                      in
-                      if
-                        (distance_line_previous_move = 2
-                        || distance_line_previous_move = -2)
-                        && distance_column_previous_move = 0
-                      then
-                        let attack_good_coord_for_en_passant =
-                          if get_color_from_player next_player = Black then
-                            ( previous_move_coord_final_line - 1,
-                              previous_move_coord_final_column )
-                            = current_move_coord_final
-                          else
-                            ( previous_move_coord_final_line + 1,
-                              previous_move_coord_final_column )
-                            = current_move_coord_final
-                        in
-                        if attack_good_coord_for_en_passant then
-                          let dead_piece =
-                            get_piece b
-                              ( previous_move_coord_final_line,
-                                previous_move_coord_final_column )
-                          in
-                          let b =
-                            set_piece b
-                              ( previous_move_coord_final_line,
-                                previous_move_coord_final_column )
-                              None
-                          in
-                          let b =
-                            move_from_coord_to_coord b current_move_coord_start
-                              current_move_coord_final
-                          in
-                          Some
-                            { b with dead_piece = dead_piece :: b.dead_piece }
-                        else None
-                      else None
-                  | _ -> None)
-              | _ -> None)
-          | _ -> None)
-      | _ -> None)
-  | _ -> None
+        is_valid_coordinates
+          (current_move_coord_start_line, current_move_coord_start_column)
+        && is_valid_coordinates
+             (current_move_coord_final_line, current_move_coord_final_column));
+      match
+        ( get_piece b
+            (current_move_coord_start_line, current_move_coord_start_column),
+          get_piece b
+            (previous_move_coord_final_line, previous_move_coord_final_column)
+        )
+      with
+      | ( Some { shape = Pawn _; color = current_piece_color },
+          Some { shape = Pawn _; color = enemy_piece_color } ) ->
+          let is_an_attack = current_piece_color <> enemy_piece_color in
+          let current_piece_advance_of_one_in_diag =
+            let distance_line_current_move =
+              current_move_coord_start_line - current_move_coord_final_line
+            in
+            let distance_column_current_move =
+              current_move_coord_start_column - current_move_coord_final_column
+            in
+            ((distance_line_current_move = -1 && current_piece_color = Black)
+            || (distance_line_current_move = 1 && current_piece_color = White))
+            && (distance_column_current_move = 1
+               || distance_column_current_move = -1)
+          in
+          let enemy_pawn_advance_of_two =
+            let distance_line_previous_move =
+              previous_move_coord_start_line - previous_move_coord_final_line
+            in
+            let distance_column_previous_move =
+              previous_move_coord_start_column
+              - previous_move_coord_final_column
+            in
+            (distance_line_previous_move = 2 || distance_line_previous_move = -2)
+            && distance_column_previous_move = 0
+          in
+          let attack_good_coord_for_en_passant =
+            if enemy_piece_color = Black then
+              ( previous_move_coord_final_line - 1,
+                previous_move_coord_final_column )
+              = (current_move_coord_final_line, current_move_coord_final_column)
+            else
+              ( previous_move_coord_final_line + 1,
+                previous_move_coord_final_column )
+              = (current_move_coord_final_line, current_move_coord_final_column)
+          in
+          current_piece_advance_of_one_in_diag && is_an_attack
+          && enemy_pawn_advance_of_two && attack_good_coord_for_en_passant
+      | _ -> false)
+  | _ -> false
 
 (*c is the color of the person being attacked*)
 let attacked_coord_by_enemy (b : board) (coord : coordinates) (c : color) =
@@ -327,9 +305,7 @@ let attacked_coord_by_enemy (b : board) (coord : coordinates) (c : color) =
         | None -> aux i (j + 1)
     in
     aux 0 0
-  else
-    let () = Format.printf "5@ " in
-    raise Invalid_coordinates
+  else raise Invalid_coordinates
 
 exception No_King
 
@@ -367,17 +343,15 @@ let chess_mate (b : board) (c : color) : bool =
   && try_or_true (line, column - 1)
   && try_or_true (line + 1, column - 1)
 
-let need_promotion b current_player (coord_final_line, coord_final_column) =
+let need_promotion b (coord_final_line, coord_final_column) =
   match get_piece b (coord_final_line, coord_final_column) with
   | Some { shape = Pawn _; color = c } ->
-      get_color_from_player current_player = c
-      && ((coord_final_line = 0 && c = White)
-         || (coord_final_line = 7 && c = Black))
+      (coord_final_line = 0 && c = White) || (coord_final_line = 7 && c = Black)
   | _ -> false
 
-let play_move (b : board) (current_player : player) (m : move)
-    (next_player : player) =
-  let current_player_color = get_color_from_player current_player in
+let play_move (b : board) current_player_choose_promotion_strategy (m : move) =
+  let current_player_color = get_other_color b.last_player in
+  let b = { b with last_player = get_other_color b.last_player } in
   match m with
   | Movement (coord_start, coord_final) ->
       if is_valid_coordinates coord_start && is_valid_coordinates coord_final
@@ -399,14 +373,14 @@ let play_move (b : board) (current_player : player) (m : move)
               if can_move b piece coord_start coord_final then
                 let b = move_from_coord_to_coord b coord_start coord_final in
                 if chess b current_player_color then None
-                else if need_promotion b current_player coord_final then
+                else if need_promotion b coord_final then
                   let b =
                     set_piece b coord_final
                       (Some
                          {
                            shape =
                              (match
-                                (get_choose_promotion current_player) b.board
+                                current_player_choose_promotion_strategy b
                               with
                              | Rook true -> Rook false
                              | s -> s);
@@ -430,15 +404,24 @@ let play_move (b : board) (current_player : player) (m : move)
                     }
                 else Some { b with last_move = Some m }
               else
-                match try_passant b piece m next_player with
-                | Some b ->
+                match (b.last_move, can_en_passant b m) with
+                | Some (Movement (_, previous_move_coord_final)), true ->
+                    let dead_piece = get_piece b previous_move_coord_final in
+                    let b = set_piece b previous_move_coord_final None in
+                    let b =
+                      move_from_coord_to_coord b coord_start coord_final
+                    in
                     if chess b current_player_color then None
-                    else Some { b with last_move = Some m }
-                | None -> None
+                    else
+                      Some
+                        {
+                          b with
+                          last_move = Some m;
+                          dead_piece = dead_piece :: b.dead_piece;
+                        }
+                | _, _ -> None
             else None
-      else
-        let () = Format.printf "6@ " in
-        raise Invalid_coordinates
+      else raise Invalid_coordinates
   | Big_Castling -> (
       let coord_king =
         if current_player_color = Black then (0, 4) else (7, 4)
@@ -459,7 +442,7 @@ let play_move (b : board) (current_player : player) (m : move)
             let b = move_from_coord_to_coord b coord_king new_coord_king in
             let b = move_from_coord_to_coord b coord_rook new_coord_rook in
             if chess b current_player_color then None
-            else Some { b with last_move = Some Big_Castling }
+            else Some { b with last_move = Some m }
           else None
       | _, _ -> None)
   | Small_Castling -> (
@@ -482,7 +465,7 @@ let play_move (b : board) (current_player : player) (m : move)
             let b = move_from_coord_to_coord b coord_king new_coord_king in
             let b = move_from_coord_to_coord b coord_rook new_coord_rook in
             if chess b current_player_color then None
-            else Some { b with last_move = Some Small_Castling }
+            else Some { b with last_move = Some m }
           else None
       | _, _ -> None)
   | _ -> None
@@ -517,7 +500,7 @@ let adjacent_possibles_move (piece : piece) ((l, c) : coordinates) =
           (l, c - 1);
         ])
 
-let stalemate (b : board) current_player next_player =
+let stalemate (b : board) =
   let rec aux l c =
     if l > 7 then true
     else if c > 7 then aux (l + 1) 0
@@ -529,9 +512,8 @@ let stalemate (b : board) current_player next_player =
             List.exists
               (fun coord ->
                 match
-                  play_move b current_player
-                    (Movement ((l, c), coord))
-                    next_player
+                  (*If a piece is to be promoted in this test. It will be promoted as queen. It does not change anything*)
+                  play_move b (fun _ -> Queen) (Movement ((l, c), coord))
                 with
                 | Some _ -> false
                 | None -> true)

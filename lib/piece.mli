@@ -10,4 +10,5 @@ type shape =
 
 type piece = { shape : shape; color : color }
 
+(*Allows to display a piece*)
 val pp_piece : Format.formatter -> piece -> unit

@@ -1,17 +1,29 @@
 open Global
 open Piece
+open Board
 
 type strategy = {
-  choose_move : color -> piece option list list -> move;
-  choose_accept_draw : color -> piece option list list -> bool;
-  choose_promotion : color -> piece option list list -> shape;
+  choose_move : color -> board -> move;
+  choose_accept_draw : color -> board -> bool;
+  choose_promotion : color -> board -> shape;
 }
 
 type player
 
+(*Method that initializes a player thanks to his color and strategy.*)
 val init_player : color -> strategy -> player
+
+(*Returns the color of the indicated player.*)
 val get_color_from_player : player -> color
-val get_choose_move_from_player : player -> piece option list list -> move
-val get_choose_accept_draw : player -> piece option list list -> bool
-val get_choose_promotion : player -> piece option list list -> shape
+
+(*Returns the strategy to choose a player’s movement.*)
+val get_choose_move_from_player : player -> board -> move
+
+(*Returns the strategy to choose draw or not.*)
+val get_choose_accept_draw : player -> board -> bool
+
+(*Returns the strategy to choose a piece promotion.*)
+val get_choose_promotion : player -> board -> shape
+
+(*Default policy for responding in the terminal.*)
 val default_strategy : unit -> strategy

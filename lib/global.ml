@@ -12,4 +12,7 @@ type move =
   | Give_Up
 
 type color = Black | White
+
+let get_other_color c = match c with Black -> White | White -> Black
+
 type results = Winner of color | Draw | Error of string
