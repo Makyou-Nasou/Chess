@@ -4,7 +4,6 @@ open Global
 open Piece
 
 type game = {
-  current_player_indice : int;
   players : player list;
   board : board;
   fifty_moves : int;
@@ -15,7 +14,6 @@ let pp_game fmt game = pp_board fmt game.board
 
 let init_game strategy_white strategy_black =
   {
-    current_player_indice = 0;
     players =
       [ init_player White strategy_white; init_player Black strategy_black ];
     board = init_board ();
@@ -23,13 +21,13 @@ let init_game strategy_white strategy_black =
     previous_position = [];
   }
 
-let set_next_player_from_game g =
-  { g with current_player_indice = 1 - g.current_player_indice }
-
-let get_current_player_from_game g = List.nth g.players g.current_player_indice
+let get_current_player_from_game g =
+  List.nth g.players
+    (match get_current_player_from_board g.board with White -> 0 | Black -> 1)
 
 let get_next_player_from_game g =
-  List.nth g.players (1 - g.current_player_indice)
+  List.nth g.players
+    (match get_current_player_from_board g.board with White -> 1 | Black -> 0)
 
 let get_board_from_game g = g.board
 
@@ -61,10 +59,10 @@ let play_move (g : game) (m : move) =
 
 let end_of_game game =
   match chess_mate game.board White with
-  | true -> Some White
+  | true -> Some Black
   | false -> (
       match chess_mate game.board Black with
-      | true -> Some Black
+      | true -> Some White
       | false -> None)
 
 let threefold_repetitions g =
@@ -112,7 +110,6 @@ let start_game strategy_white strategy_black =
       | mv -> (
           match play_move game mv with
           | Some game -> (
-              let game = set_next_player_from_game game in
               match end_of_game game with
               | Some t ->
                   let () = pp_game Format.std_formatter game in

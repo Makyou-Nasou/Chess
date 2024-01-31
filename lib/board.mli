@@ -20,6 +20,9 @@ val get_board_from_board : board -> piece option list list
 (*Returns the last move that was played on the board.*)
 val get_last_move_from_board : board -> move option
 
+(*Return the player who must play*)
+val get_current_player_from_board : board -> color
+
 (*Checks if the boxes of the line between the coordinates indicated are empty (coordination indicated excluded). Be careful, if it is not a row or column returns false. If the coordinates are outside the board raise Invalid_coordinates.*)
 val empty_straight : board -> coordinates -> coordinates -> bool
 

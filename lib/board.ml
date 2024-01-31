@@ -5,7 +5,7 @@ type board = {
   board : piece option list list;
   last_move : move option;
   dead_piece : piece option list;
-  last_player : color;
+  current_player : color;
 }
 
 let get_starter_piece ((line, column) : coordinates) =
@@ -37,7 +37,7 @@ let init_board () =
           List.init 8 (fun column -> get_starter_piece (line, column)));
     last_move = None;
     dead_piece = [];
-    last_player = Black;
+    current_player = White;
   }
 
 let pp_board fmt b =
@@ -90,6 +90,7 @@ let pp_board fmt b =
 
 let get_board_from_board b = b.board
 let get_last_move_from_board b = b.last_move
+let get_current_player_from_board b = b.current_player
 
 let get_piece (b : board) (c : coordinates) =
   if is_valid_coordinates c then
@@ -326,23 +327,6 @@ let find_king (b : board) (c : color) : coordinates =
 let chess (b : board) (c : color) : bool =
   attacked_coord_by_enemy b (find_king b c) c
 
-(*Check if player c has lost*)
-let chess_mate (b : board) (c : color) : bool =
-  let try_or_true (line, column) =
-    try attacked_coord_by_enemy b (line, column) c
-    with Invalid_coordinates -> true
-  in
-  let line, column = find_king b c in
-  try_or_true (line, column)
-  && try_or_true (line + 1, column)
-  && try_or_true (line + 1, column + 1)
-  && try_or_true (line, column + 1)
-  && try_or_true (line - 1, column + 1)
-  && try_or_true (line - 1, column)
-  && try_or_true (line - 1, column - 1)
-  && try_or_true (line, column - 1)
-  && try_or_true (line + 1, column - 1)
-
 let need_promotion b (coord_final_line, coord_final_column) =
   match get_piece b (coord_final_line, coord_final_column) with
   | Some { shape = Pawn _; color = c } ->
@@ -350,8 +334,8 @@ let need_promotion b (coord_final_line, coord_final_column) =
   | _ -> false
 
 let play_move (b : board) current_player_choose_promotion_strategy (m : move) =
-  let current_player_color = get_other_color b.last_player in
-  let b = { b with last_player = get_other_color b.last_player } in
+  let current_player_color = b.current_player in
+  let b = { b with current_player = get_other_color b.current_player } in
   match m with
   | Movement (coord_start, coord_final) ->
       if is_valid_coordinates coord_start && is_valid_coordinates coord_final
@@ -373,19 +357,21 @@ let play_move (b : board) current_player_choose_promotion_strategy (m : move) =
               if can_move b piece coord_start coord_final then
                 let b = move_from_coord_to_coord b coord_start coord_final in
                 if chess b current_player_color then None
-                else if need_promotion b coord_final then
+                else
                   let b =
-                    set_piece b coord_final
-                      (Some
-                         {
-                           shape =
-                             (match
-                                current_player_choose_promotion_strategy b
-                              with
-                             | Rook true -> Rook false
-                             | s -> s);
-                           color = current_player_color;
-                         })
+                    if need_promotion b coord_final then
+                      set_piece b coord_final
+                        (Some
+                           {
+                             shape =
+                               (match
+                                  current_player_choose_promotion_strategy b
+                                with
+                               | Rook true -> Rook false
+                               | s -> s);
+                             color = current_player_color;
+                           })
+                    else b
                   in
                   if enemy_on_destination then
                     Some
@@ -395,14 +381,6 @@ let play_move (b : board) current_player_choose_promotion_strategy (m : move) =
                         dead_piece = dead_piece :: b.dead_piece;
                       }
                   else Some { b with last_move = Some m }
-                else if enemy_on_destination then
-                  Some
-                    {
-                      b with
-                      last_move = Some m;
-                      dead_piece = dead_piece :: b.dead_piece;
-                    }
-                else Some { b with last_move = Some m }
               else
                 match (b.last_move, can_en_passant b m) with
                 | Some (Movement (_, previous_move_coord_final)), true ->
@@ -469,6 +447,90 @@ let play_move (b : board) current_player_choose_promotion_strategy (m : move) =
           else None
       | _, _ -> None)
   | _ -> None
+
+let get_possible_move (piece : piece) ((l, c) : coordinates) =
+  let get_line_column_coord (i : int) =
+    if i < 8 then if i < c then (l, i) else (l, i + 1)
+    else
+      let i = i - 8 in
+      if i < l then (i, c) else (i + 1, c)
+  in
+  let get_diag_coord (i : int) =
+    if i < 8 then (l - i - 1, c - i - 1)
+    else
+      let i = i - 8 in
+      if i < 8 then (l + i + 1, c - i - 1)
+      else
+        let i = i - 8 in
+        if i < 8 then (l - i + 1, c - i - 1)
+        else
+          let i = i - 8 in
+          (l - i - 1, c + i + 1)
+  in
+  List.filter
+    (fun c -> is_valid_coordinates c)
+    (match (piece.shape, piece.color) with
+    | Rook _, _ -> List.init 14 (fun i -> get_line_column_coord i)
+    | Horse, _ ->
+        [
+          (l + 1, c + 2);
+          (l + 2, c + 1);
+          (l + 1, c - 2);
+          (l - 2, c + 1);
+          (l - 1, c + 2);
+          (l + 2, c - 1);
+          (l - 2, c - 1);
+          (l - 1, c - 2);
+        ]
+    | Bishop, _ -> List.init 32 (fun i -> get_diag_coord i)
+    | Pawn _, Black -> [ (l + 1, c + 1); (l + 1, c - 1); (l + 1, c) ]
+    | Pawn _, White -> [ (l - 1, c + 1); (l - 1, c - 1); (l - 1, c) ]
+    | King _, _ ->
+        [
+          (l + 1, c + 1);
+          (l - 1, c + 1);
+          (l - 1, c - 1);
+          (l + 1, c - 1);
+          (l + 1, c);
+          (l, c + 1);
+          (l - 1, c);
+          (l, c - 1);
+        ]
+    | Queen, _ ->
+        List.init 46 (fun i ->
+            if i < 15 then get_line_column_coord i else get_diag_coord (15 - i)))
+
+let rec fold_left_i f i acc l =
+  match l with [] -> acc | x :: xs -> fold_left_i f (i + 1) (f i x acc) xs
+
+(*Check if player c has lost*)
+let chess_mate (b : board) (c : color) : bool =
+  let try_move (line_start, column_start) (line_finish, column_finish) =
+    try
+      play_move b
+        (fun _ -> Queen)
+        (Movement ((line_start, column_start), (line_finish, column_finish)))
+      <> None
+    with Invalid_coordinates -> false
+  in
+  chess b c
+  && not
+       (fold_left_i
+          (fun (n_line : int) (line : piece option list) (acc1 : bool) ->
+            acc1
+            || fold_left_i
+                 (fun (n_column : int) (piece : piece option) (acc2 : bool) ->
+                   match piece with
+                   | None -> acc2
+                   | Some piece ->
+                       if piece.color <> c then acc2
+                       else
+                         acc2
+                         || List.exists
+                              (fun (x, y) -> try_move (n_line, n_column) (x, y))
+                              (get_possible_move piece (n_line, n_column)))
+                 0 false line)
+          0 false (get_board_from_board b))
 
 let adjacent_possibles_move (piece : piece) ((l, c) : coordinates) =
   List.filter
