@@ -6,9 +6,11 @@ open Piece
 type game = {
   players : player list;
   board : board;
-  fifty_moves : int;
   previous_position : piece option list list list;
 }
+
+type game_status = Continue_game of game | Draw_game of game | Game_error
+type final_status = Winner of color | Draw | Error of string
 
 let pp_game fmt game = pp_board fmt game.board
 
@@ -17,7 +19,6 @@ let init_game strategy_white strategy_black =
     players =
       [ init_player White strategy_white; init_player Black strategy_black ];
     board = init_board ();
-    fifty_moves = 0;
     previous_position = [];
   }
 
@@ -31,31 +32,21 @@ let get_next_player_from_game g =
 
 let get_board_from_game g = g.board
 
-let play_move (g : game) (m : move) =
+let play_move (g : game) (m : move) : game_status option =
   let current_player = get_current_player_from_game g in
-  let current_player_color = get_color_from_player current_player in
-  let fifty_rule =
-    match m with
-    | Movement (coord_start, coord_final) -> (
-        (match get_piece g.board coord_start with
-        | Some { shape = Pawn _; color = _ } -> true
-        | _ -> false)
-        ||
-        match get_piece g.board coord_final with
-        | Some p -> p.color <> current_player_color
-        | None -> false)
-    | _ -> false
-  in
   Board.play_move g.board (get_choose_promotion current_player) m
-  |> Option.map (fun b ->
-         let fifty_moves = if fifty_rule then 0 else g.fifty_moves + 1 in
-         {
-           g with
-           fifty_moves;
-           board = b;
-           previous_position =
-             get_board_from_board g.board :: g.previous_position;
-         })
+  |> Option.map (fun s ->
+         let g =
+           {
+             g with
+             previous_position =
+               get_board_from_board g.board :: g.previous_position;
+           }
+         in
+         match s with
+         | Draw_board b -> Draw_game { g with board = b }
+         | Continue_board b -> Continue_game { g with board = b }
+         | _ -> Game_error)
 
 let end_of_game game =
   match chess_mate game.board White with
@@ -109,7 +100,15 @@ let start_game strategy_white strategy_black =
           else aux game (nbr_try - 1)
       | mv -> (
           match play_move game mv with
-          | Some game -> (
+          | Some (Draw_game game) ->
+              let () = pp_game Format.std_formatter game in
+              let () =
+                Format.fprintf Format.std_formatter
+                  "More than 50 moves without moving pawns or eating enemy \
+                   piece.@ "
+              in
+              Draw
+          | Some (Continue_game game) -> (
               match end_of_game game with
               | Some t ->
                   let () = pp_game Format.std_formatter game in
@@ -122,14 +121,6 @@ let start_game strategy_white strategy_black =
                         "More than 3 repetitions.@ "
                     in
                     Draw
-                  else if game.fifty_moves > 50 then
-                    let () = pp_game Format.std_formatter game in
-                    let () =
-                      Format.fprintf Format.std_formatter
-                        "More than 50 moves without moving pawns or eating \
-                         enemy piece.@ "
-                    in
-                    Draw
                   else if stalemate game.board then
                     let () = pp_game Format.std_formatter game in
                     let () =
@@ -137,6 +128,7 @@ let start_game strategy_white strategy_black =
                     in
                     Draw
                   else aux game 3)
+          | Some Game_error -> Error "Play_move produces an error."
           | None -> aux game (nbr_try - 1))
   in
   try aux (init_game strategy_white strategy_black) 3

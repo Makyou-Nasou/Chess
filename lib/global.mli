@@ -15,5 +15,4 @@ type move =
 type color = Black | White
 
 val get_other_color : color -> color
-
-type results = Winner of color | Draw | Error of string
+val convert_coordinates : string -> coordinates

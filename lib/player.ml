@@ -16,15 +16,6 @@ let get_choose_move_from_player (p : player) = p.strategy.choose_move p.color
 let get_choose_accept_draw (p : player) = p.strategy.choose_accept_draw p.color
 let get_choose_promotion (p : player) = p.strategy.choose_promotion p.color
 
-let convert_coordinates (coord : string) : (int * int) * (int * int) =
-  let convert_char c = Char.code c - Char.code 'a' in
-  let convert_chiffre c = Char.code '8' - Char.code c in
-  let y1 = convert_char coord.[0] in
-  let x1 = convert_chiffre coord.[1] in
-  let y2 = convert_char coord.[3] in
-  let x2 = convert_chiffre coord.[4] in
-  ((x1, y1), (x2, y2))
-
 let rec request_action question =
   Format.printf "%s:@ " question;
   Format.print_flush ();
@@ -38,14 +29,22 @@ let rec request_action question =
           Format.printf "Invalid entry.@;";
           request_action question)
         else
-          let (x1, y1), (x2, y2) = convert_coordinates s in
-          if
-            (not (is_valid_coordinates (x1, y1)))
-            || not (is_valid_coordinates (x2, y2))
-          then (
+          let coord = String.split_on_char ' ' s in
+          if List.length coord <> 2 then (
             Format.printf "Invalid entry.@;";
             request_action question)
-          else Movement ((x1, y1), (x2, y2)))
+          else
+            let (x1, y1), (x2, y2) =
+              ( convert_coordinates (List.nth coord 0),
+                convert_coordinates (List.nth coord 1) )
+            in
+            if
+              (not (is_valid_coordinates (x1, y1)))
+              || not (is_valid_coordinates (x2, y2))
+            then (
+              Format.printf "Invalid entry.@;";
+              request_action question)
+            else Movement ((x1, y1), (x2, y2)))
   with Failure _ ->
     Format.printf "Invalid entry.@;";
     request_action question
@@ -67,7 +66,7 @@ let rec request_piece question =
       if s = "Q" then Queen
       else if s = "R" then Rook false
       else if s = "B" then Bishop
-      else if s = "H" then Horse
+      else if s = "K" then Knight
       else (
         Format.printf "Invalid entry : your answer is not correct.@;";
         request_piece question))
@@ -75,7 +74,7 @@ let rec request_piece question =
 let default_choose_move _ _ =
   request_action
     "Choose move on format : \"start finish\" (example : a2 a3) or \"bc\" for \
-     big castling or \"sg\" for small castling or \"d\" to propose draw or \
+     big castling or \"sc\" for small castling or \"d\" to propose draw or \
      \"gu\" for give up."
 
 let default_choose_accept_draw _ _ =
@@ -84,7 +83,7 @@ let default_choose_accept_draw _ _ =
 let default_choose_promotion _ _ =
   request_piece
     "What do you want to turn your pawn into? (Q for Queen, R for Rook, B for \
-     Bishop and H for Horse)"
+     Bishop and K for Knight)"
 
 let default_strategy () =
   {

@@ -6,39 +6,175 @@ type board = {
   last_move : move option;
   dead_piece : piece option list;
   current_player : color;
+  fifty_moves : int;
 }
 
-let get_starter_piece ((line, column) : coordinates) =
-  assert (is_valid_coordinates (line, column));
-  match line with
-  | 1 -> Some { shape = Pawn true; color = Black }
-  | 6 -> Some { shape = Pawn true; color = White }
-  | _ -> (
-      let color =
-        match line with 0 -> Some Black | 7 -> Some White | _ -> None
+type board_status =
+  | Continue_board of board
+  | Draw_board of board
+  | Error_board of string
+
+let get_piece (b : board) (c : coordinates) =
+  if is_valid_coordinates c then
+    match c with x, y -> List.nth (List.nth b.board x) y
+  else raise Invalid_coordinates
+
+let char_to_piece = function
+  | 'K' -> Some { shape = King false; color = White }
+  | 'Q' -> Some { shape = Queen; color = White }
+  | 'R' -> Some { shape = Rook false; color = White }
+  | 'B' -> Some { shape = Bishop; color = White }
+  | 'N' -> Some { shape = Knight; color = White }
+  | 'P' -> Some { shape = Pawn false; color = White }
+  | 'k' -> Some { shape = King false; color = Black }
+  | 'q' -> Some { shape = Queen; color = Black }
+  | 'r' -> Some { shape = Rook false; color = Black }
+  | 'b' -> Some { shape = Bishop; color = Black }
+  | 'n' -> Some { shape = Knight; color = Black }
+  | 'p' -> Some { shape = Pawn false; color = Black }
+  | _ -> None
+
+let rec fold_left_i f i acc l =
+  match l with [] -> acc | x :: xs -> fold_left_i f (i + 1) (f i x acc) xs
+
+exception Invalid_fen
+
+let parse (current_line : piece option list) = function
+  | '1' .. '8' as num ->
+      let num_spaces = int_of_char num - int_of_char '0' in
+      let rec add_empty i l =
+        if i = 0 then l else None :: add_empty (i - 1) l
       in
-      let shape =
-        match column with
-        | 0 | 7 -> Some (Rook true)
-        | 1 | 6 -> Some Horse
-        | 2 | 5 -> Some Bishop
-        | 3 -> Some Queen
-        | 4 -> Some (King true)
-        | _ -> None
+      add_empty num_spaces current_line
+  | char -> char_to_piece char :: current_line
+
+let fen_to_board (fen : string) : board =
+  let fen = String.split_on_char ' ' fen in
+  match fen with
+  | [
+   info_piece;
+   current_player;
+   castling;
+   en_passant;
+   fifty_moves;
+   (*number_of_move*) _;
+  ] -> (
+      let info_piece = String.split_on_char '/' info_piece in
+      let board =
+        List.fold_left
+          (fun acc1 s ->
+            String.fold_left (fun acc2 c -> parse acc2 c) [] s :: acc1)
+          [] info_piece
       in
-      match (color, shape) with
-      | None, _ | _, None -> None
-      | Some c, Some s -> Some { shape = s; color = c })
+      let current_player =
+        match current_player with
+        | "w" -> White
+        | "b" -> Black
+        | _ -> raise Invalid_fen
+      in
+      let board =
+        fold_left_i
+          (fun x line acc1 ->
+            fold_left_i
+              (fun y piece acc2 ->
+                (match piece with
+                | Some { shape = King false; color = Black } ->
+                    if
+                      String.contains castling 'k'
+                      || String.contains castling 'q'
+                    then
+                      if (x, y) = (7, 3) then
+                        Some { shape = King true; color = Black }
+                      else
+                        raise Invalid_fen
+                    else Some { shape = King false; color = Black }
+                | Some { shape = Rook false; color = Black } ->
+                    if
+                      (String.contains castling 'k'
+                      || String.contains castling 'q')
+                      && (x, y) <> (7, 0)
+                      && (x, y) <> (7, 7)
+                    then raise Invalid_fen
+                    else if (x, y) = (7, 0) then
+                      if String.contains castling 'k' then
+                        Some { shape = Rook true; color = Black }
+                      else Some { shape = Rook false; color = Black }
+                    else if (x, y) = (7, 7) then
+                      if String.contains castling 'q' then
+                        Some { shape = Rook true; color = Black }
+                      else Some { shape = Rook false; color = Black }
+                    else Some { shape = Rook false; color = Black }
+                | Some { shape = King false; color = White } ->
+                    if
+                      String.contains castling 'K'
+                      || String.contains castling 'Q'
+                    then
+                      if (x, y) = (0, 3) then
+                        Some { shape = King true; color = White }
+                      else
+                        raise Invalid_fen
+                    else Some { shape = King false; color = White }
+                | Some { shape = Rook false; color = White } ->
+                    if
+                      (String.contains castling 'k'
+                      || String.contains castling 'q')
+                      && (x, y) <> (0, 0)
+                      && (x, y) <> (0, 7)
+                    then raise Invalid_fen
+                    else if (x, y) = (0, 0) then
+                      if String.contains castling 'k' then
+                        Some { shape = Rook true; color = White }
+                      else Some { shape = Rook false; color = White }
+                    else if (x, y) = (0, 7) then
+                      if String.contains castling 'q' then
+                        Some { shape = Rook true; color = White }
+                      else Some { shape = Rook false; color = White }
+                    else Some { shape = Rook false; color = White }
+                    |Some { shape = Pawn false; color = White } -> if x = 1 then Some { shape = Pawn true; color = White } else Some { shape = Pawn false; color = White }
+                    |Some { shape = Pawn false; color = Black } -> if x = 6 then Some { shape = Pawn true; color = Black } else Some { shape = Pawn false; color = Black }
+                    | piece -> piece)
+                :: acc2)
+              0 [] line
+            :: acc1)
+          0 [] board
+      in
+      let b =
+        {
+          board;
+          last_move = None;
+          dead_piece = [];
+          current_player;
+          fifty_moves =
+            (try
+               let fifty_moves = int_of_string fifty_moves in
+               if 0 <= fifty_moves && fifty_moves < 50 then fifty_moves
+               else raise Invalid_fen
+             with _ -> raise Invalid_fen);
+        }
+      in
+      match en_passant with
+      | "-" -> { b with last_move = None }
+      | coord ->
+          let l, c = convert_coordinates coord in
+          if current_player = Black then
+            if
+              get_piece b (l + 1, c) <> None
+              || get_piece b (l, c) <> None
+              || get_piece b (l - 1, c)
+                 <> Some { shape = Pawn false; color = White }
+            then raise Invalid_fen
+            else { b with last_move = Some (Movement ((l + 1, c), (l - 1, c))) }
+          else if
+            get_piece b (l - 1, c) <> None
+            || get_piece b (l, c) <> None
+            || get_piece b (l + 1, c)
+               <> Some { shape = Pawn false; color = Black }
+          then raise Invalid_fen
+          else { b with last_move = Some (Movement ((l - 1, c), (l + 1, c))) })
+  | _ -> raise Invalid_fen
 
 let init_board () =
-  {
-    board =
-      List.init 8 (fun line ->
-          List.init 8 (fun column -> get_starter_piece (line, column)));
-    last_move = None;
-    dead_piece = [];
-    current_player = White;
-  }
+  fen_to_board "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
 let pp_board fmt b =
   let () =
@@ -91,11 +227,6 @@ let pp_board fmt b =
 let get_board_from_board b = b.board
 let get_last_move_from_board b = b.last_move
 let get_current_player_from_board b = b.current_player
-
-let get_piece (b : board) (c : coordinates) =
-  if is_valid_coordinates c then
-    match c with x, y -> List.nth (List.nth b.board x) y
-  else raise Invalid_coordinates
 
 let set_piece (b : board) (line, column) piece =
   {
@@ -192,7 +323,7 @@ let can_move (b : board) (p : piece) (coord_start : coordinates)
             || empty_straight b coord_start coord_final
         | Bishop -> empty_diagonal b coord_start coord_final
         | Rook _ -> empty_straight b coord_start coord_final
-        | Horse ->
+        | Knight ->
             (distance_line = 2 || distance_line = -2)
             && (distance_column = 1 || distance_column = -1)
             || (distance_line = 1 || distance_line = -1)
@@ -335,9 +466,29 @@ let need_promotion b (coord_final_line, coord_final_column) =
 
 let play_move (b : board) current_player_choose_promotion_strategy (m : move) =
   let current_player_color = b.current_player in
-  let b = { b with current_player = get_other_color b.current_player } in
+  let b =
+    {
+      b with
+      current_player = get_other_color b.current_player;
+      fifty_moves =
+        (if current_player_color = Black then b.fifty_moves + 1
+         else b.fifty_moves + 1);
+    }
+  in
   match m with
   | Movement (coord_start, coord_final) ->
+      let b =
+        let fifty_rule =
+          (match get_piece b coord_start with
+          | Some { shape = Pawn _; color = _ } -> true
+          | _ -> false)
+          ||
+          match get_piece b coord_final with
+          | Some p -> p.color <> current_player_color
+          | None -> false
+        in
+        { b with fifty_moves = (if fifty_rule then 0 else b.fifty_moves) }
+      in
       if is_valid_coordinates coord_start && is_valid_coordinates coord_final
       then
         match get_piece b coord_start with
@@ -373,14 +524,17 @@ let play_move (b : board) current_player_choose_promotion_strategy (m : move) =
                            })
                     else b
                   in
-                  if enemy_on_destination then
-                    Some
+                  let b =
+                    if enemy_on_destination then
                       {
                         b with
                         last_move = Some m;
                         dead_piece = dead_piece :: b.dead_piece;
                       }
-                  else Some { b with last_move = Some m }
+                    else { b with last_move = Some m }
+                  in
+                  if b.fifty_moves >= 50 then Some (Draw_board b)
+                  else Some (Continue_board b)
               else
                 match (b.last_move, can_en_passant b m) with
                 | Some (Movement (_, previous_move_coord_final)), true ->
@@ -391,59 +545,51 @@ let play_move (b : board) current_player_choose_promotion_strategy (m : move) =
                     in
                     if chess b current_player_color then None
                     else
-                      Some
+                      let b =
                         {
                           b with
                           last_move = Some m;
                           dead_piece = dead_piece :: b.dead_piece;
                         }
+                      in
+                      if b.fifty_moves >= 50 then Some (Draw_board b)
+                      else Some (Continue_board b)
                 | _, _ -> None
             else None
       else raise Invalid_coordinates
-  | Big_Castling -> (
+  | Big_Castling | Small_Castling -> (
       let coord_king =
         if current_player_color = Black then (0, 4) else (7, 4)
       in
       let coord_rook =
-        if current_player_color = Black then (0, 0) else (7, 0)
+        if m = Big_Castling then
+          if current_player_color = Black then (0, 0) else (7, 0)
+        else if current_player_color = Black then (0, 7)
+        else (7, 7)
       in
       match (get_piece b coord_king, get_piece b coord_king) with
       | Some { shape = King b1; color = _ }, Some { shape = Rook b2; color = _ }
         ->
           if b1 && b2 && empty_straight b coord_king coord_rook then
             let new_coord_king =
-              if current_player_color = Black then (0, 2) else (7, 2)
+              if m = Big_Castling then
+                if current_player_color = Black then (0, 2) else (7, 2)
+              else if current_player_color = Black then (0, 6)
+              else (7, 6)
             in
             let new_coord_rook =
-              if current_player_color = Black then (0, 3) else (7, 3)
+              if m = Big_Castling then
+                if current_player_color = Black then (0, 3) else (7, 3)
+              else if current_player_color = Black then (0, 5)
+              else (7, 5)
             in
             let b = move_from_coord_to_coord b coord_king new_coord_king in
             let b = move_from_coord_to_coord b coord_rook new_coord_rook in
             if chess b current_player_color then None
-            else Some { b with last_move = Some m }
-          else None
-      | _, _ -> None)
-  | Small_Castling -> (
-      let coord_king =
-        if current_player_color = Black then (0, 4) else (7, 4)
-      in
-      let coord_rook =
-        if current_player_color = Black then (0, 7) else (7, 7)
-      in
-      match (get_piece b coord_king, get_piece b coord_king) with
-      | Some { shape = King b1; color = _ }, Some { shape = Rook b2; color = _ }
-        ->
-          if b1 && b2 && empty_straight b coord_king coord_rook then
-            let new_coord_king =
-              if current_player_color = Black then (0, 6) else (7, 6)
-            in
-            let new_coord_rook =
-              if current_player_color = Black then (0, 5) else (7, 5)
-            in
-            let b = move_from_coord_to_coord b coord_king new_coord_king in
-            let b = move_from_coord_to_coord b coord_rook new_coord_rook in
-            if chess b current_player_color then None
-            else Some { b with last_move = Some m }
+            else
+              let b = { b with last_move = Some m } in
+              if b.fifty_moves >= 50 then Some (Draw_board b)
+              else Some (Continue_board b)
           else None
       | _, _ -> None)
   | _ -> None
@@ -471,7 +617,7 @@ let get_possible_move (piece : piece) ((l, c) : coordinates) =
     (fun c -> is_valid_coordinates c)
     (match (piece.shape, piece.color) with
     | Rook _, _ -> List.init 14 (fun i -> get_line_column_coord i)
-    | Horse, _ ->
+    | Knight, _ ->
         [
           (l + 1, c + 2);
           (l + 2, c + 1);
@@ -499,9 +645,6 @@ let get_possible_move (piece : piece) ((l, c) : coordinates) =
     | Queen, _ ->
         List.init 46 (fun i ->
             if i < 15 then get_line_column_coord i else get_diag_coord (15 - i)))
-
-let rec fold_left_i f i acc l =
-  match l with [] -> acc | x :: xs -> fold_left_i f (i + 1) (f i x acc) xs
 
 (*Check if player c has lost*)
 let chess_mate (b : board) (c : color) : bool =
@@ -537,7 +680,7 @@ let adjacent_possibles_move (piece : piece) ((l, c) : coordinates) =
     (fun c -> is_valid_coordinates c)
     (match piece.shape with
     | Rook _ -> [ (l + 1, c); (l, c + 1); (l - 1, c); (l, c - 1) ]
-    | Horse ->
+    | Knight ->
         [
           (l + 1, c + 2);
           (l + 2, c + 1);

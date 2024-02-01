@@ -3,6 +3,8 @@ open Global
 open Board
 
 type game
+type game_status = Continue_game of game | Draw_game of game | Game_error
+type final_status = Winner of color | Draw | Error of string
 
 (*Method that initializes a game, with all its attributes. Including its board and players.*)
 val init_game : strategy -> strategy -> game
@@ -20,7 +22,7 @@ val get_next_player_from_game : game -> player
 val get_board_from_game : game -> board
 
 (*Play the current player’s turn.*)
-val play_move : game -> move -> game option
+val play_move : game -> move -> game_status option
 
 (*Play a full game in a terminal. Take the statégies of both players.*)
-val start_game : strategy -> strategy -> results
+val start_game : strategy -> strategy -> final_status

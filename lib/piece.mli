@@ -5,7 +5,7 @@ type shape =
   | Queen
   | Rook of bool
   | Bishop
-  | Horse
+  | Knight
   | Pawn of bool
 
 type piece = { shape : shape; color : color }

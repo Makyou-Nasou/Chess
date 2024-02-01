@@ -3,6 +3,11 @@ open Global
 
 type board
 
+type board_status =
+  | Continue_board of board
+  | Draw_board of board
+  | Error_board of string
+
 exception No_King
 
 (*Method that initializes a board with black at the top, white at the bottom.*)
@@ -30,7 +35,7 @@ val empty_straight : board -> coordinates -> coordinates -> bool
 val empty_diagonal : board -> coordinates -> coordinates -> bool
 
 (*Method that take a board, and a function that allows you to choose the promotion of a piece (see choose_promotion in player). Plays the movement of the current player on this board. May raise No_King or Invalid_coordinates, but this implies that the board is broken.*)
-val play_move : board -> (board -> shape) -> move -> board option
+val play_move : board -> (board -> shape) -> move -> board_status option
 
 (*Method that takes a board and a move. And checks if the movement allows to apply the rule of "en passant".*)
 val can_en_passant : board -> move -> bool
