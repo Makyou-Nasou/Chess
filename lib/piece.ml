@@ -5,7 +5,7 @@ type shape =
   | Queen
   | Rook of bool
   | Bishop
-  | Horse
+  | Knight
   | Pawn of bool
 
 type piece = { shape : shape; color : color }
@@ -17,7 +17,7 @@ let pp_piece fmt piece =
     | Queen -> ( match piece.color with Black -> "♛" | White -> "♕")
     | Rook _ -> ( match piece.color with Black -> "♜" | White -> "♖")
     | Bishop -> ( match piece.color with Black -> "♝" | White -> "♗")
-    | Horse -> ( match piece.color with Black -> "♞" | White -> "♘")
+    | Knight -> ( match piece.color with Black -> "♞" | White -> "♘")
     | Pawn _ -> ( match piece.color with Black -> "♟" | White -> "♙")
   in
   Format.fprintf fmt "%s" p_str

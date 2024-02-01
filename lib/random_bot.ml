@@ -22,7 +22,7 @@ let all_posible_move () =
 
 let random_choose_promotion _ _ =
   List.nth
-    [ Queen; Rook (List.nth [ true; false ] (Random.int 2)); Horse; Bishop ]
+    [ Queen; Rook (List.nth [ true; false ] (Random.int 2)); Knight; Bishop ]
     (Random.int 4)
 
 let random_choose_move (color : color) (board : board) =

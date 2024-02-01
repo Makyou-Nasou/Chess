@@ -85,8 +85,7 @@ let fen_to_board (fen : string) : board =
                     then
                       if (x, y) = (7, 3) then
                         Some { shape = King true; color = Black }
-                      else
-                        raise Invalid_fen
+                      else raise Invalid_fen
                     else Some { shape = King false; color = Black }
                 | Some { shape = Rook false; color = Black } ->
                     if
@@ -111,8 +110,7 @@ let fen_to_board (fen : string) : board =
                     then
                       if (x, y) = (0, 3) then
                         Some { shape = King true; color = White }
-                      else
-                        raise Invalid_fen
+                      else raise Invalid_fen
                     else Some { shape = King false; color = White }
                 | Some { shape = Rook false; color = White } ->
                     if
@@ -130,9 +128,13 @@ let fen_to_board (fen : string) : board =
                         Some { shape = Rook true; color = White }
                       else Some { shape = Rook false; color = White }
                     else Some { shape = Rook false; color = White }
-                    |Some { shape = Pawn false; color = White } -> if x = 1 then Some { shape = Pawn true; color = White } else Some { shape = Pawn false; color = White }
-                    |Some { shape = Pawn false; color = Black } -> if x = 6 then Some { shape = Pawn true; color = Black } else Some { shape = Pawn false; color = Black }
-                    | piece -> piece)
+                | Some { shape = Pawn false; color = White } ->
+                    if x = 1 then Some { shape = Pawn true; color = White }
+                    else Some { shape = Pawn false; color = White }
+                | Some { shape = Pawn false; color = Black } ->
+                    if x = 6 then Some { shape = Pawn true; color = Black }
+                    else Some { shape = Pawn false; color = Black }
+                | piece -> piece)
                 :: acc2)
               0 [] line
             :: acc1)
@@ -567,10 +569,15 @@ let play_move (b : board) current_player_choose_promotion_strategy (m : move) =
         else if current_player_color = Black then (0, 7)
         else (7, 7)
       in
-      match (get_piece b coord_king, get_piece b coord_king) with
-      | Some { shape = King b1; color = _ }, Some { shape = Rook b2; color = _ }
-        ->
-          if b1 && b2 && empty_straight b coord_king coord_rook then
+      match (get_piece b coord_king, get_piece b coord_rook) with
+      | ( Some { shape = King b1; color = color1 },
+          Some { shape = Rook b2; color = color2 } ) ->
+          if
+            b1 && b2
+            && empty_straight b coord_king coord_rook
+            && color1 = current_player_color
+            && color2 = current_player_color
+          then
             let new_coord_king =
               if m = Big_Castling then
                 if current_player_color = Black then (0, 2) else (7, 2)
