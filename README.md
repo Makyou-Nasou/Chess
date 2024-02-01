@@ -3,7 +3,7 @@
 
 | Name                |
 | :------------------ |
-| Makyou-Nasou        |
+| Thomas ARROUS       |
 
 ## Development environment setup
 
