@@ -18,7 +18,9 @@ let init_game strategy_white strategy_black =
   {
     players =
       [ init_player White strategy_white; init_player Black strategy_black ];
-    board = init_board ();
+    board =
+      generate_board_with_fen
+        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
     previous_position = [];
   }
 

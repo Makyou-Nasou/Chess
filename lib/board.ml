@@ -48,7 +48,7 @@ let parse (current_line : piece option list) = function
       add_empty num_spaces current_line
   | char -> char_to_piece char :: current_line
 
-let fen_to_board (fen : string) : board =
+let generate_board_with_fen (fen : string) : board =
   let fen = String.split_on_char ' ' fen in
   match fen with
   | [
@@ -140,43 +140,74 @@ let fen_to_board (fen : string) : board =
             :: acc1)
           0 [] board
       in
-      let b =
-        {
-          board;
-          last_move = None;
-          dead_piece = [];
-          current_player;
-          fifty_moves =
-            (try
-               let fifty_moves = int_of_string fifty_moves in
-               if 0 <= fifty_moves && fifty_moves < 50 then fifty_moves
-               else raise Invalid_fen
-             with _ -> raise Invalid_fen);
-        }
-      in
-      match en_passant with
-      | "-" -> { b with last_move = None }
-      | coord ->
-          let l, c = convert_coordinates coord in
-          if current_player = Black then
-            if
-              get_piece b (l + 1, c) <> None
-              || get_piece b (l, c) <> None
-              || get_piece b (l - 1, c)
-                 <> Some { shape = Pawn false; color = White }
-            then raise Invalid_fen
-            else { b with last_move = Some (Movement ((l + 1, c), (l - 1, c))) }
-          else if
-            get_piece b (l - 1, c) <> None
-            || get_piece b (l, c) <> None
-            || get_piece b (l + 1, c)
-               <> Some { shape = Pawn false; color = Black }
-          then raise Invalid_fen
-          else { b with last_move = Some (Movement ((l - 1, c), (l + 1, c))) })
+      if
+        List.length board <> 8
+        || List.exists (fun l -> List.length l <> 8) board
+      then raise Invalid_fen
+      else
+        let cmp_white_king =
+          List.fold_left
+            (fun acc1 line ->
+              List.fold_left
+                (fun acc2 piece ->
+                  match piece with
+                  | Some { shape = King _; color = White } -> acc2 + 1
+                  | _ -> acc2)
+                acc1 line)
+            0 board
+        in
+        let cmp_black_king =
+          List.fold_left
+            (fun acc1 line ->
+              List.fold_left
+                (fun acc2 piece ->
+                  match piece with
+                  | Some { shape = King _; color = Black } -> acc2 + 1
+                  | _ -> acc2)
+                acc1 line)
+            0 board
+        in
+        if cmp_white_king != 1 || cmp_black_king != 1 then raise Invalid_fen
+        else
+          let b =
+            {
+              board;
+              last_move = None;
+              dead_piece = [];
+              current_player;
+              fifty_moves =
+                (try
+                   let fifty_moves = int_of_string fifty_moves in
+                   if 0 <= fifty_moves && fifty_moves < 50 then fifty_moves
+                   else raise Invalid_fen
+                 with _ -> raise Invalid_fen);
+            }
+          in
+          match en_passant with
+          | "-" -> { b with last_move = None }
+          | coord ->
+              let l, c = convert_coordinates coord in
+              if current_player = Black then
+                if
+                  get_piece b (l + 1, c) <> None
+                  || get_piece b (l, c) <> None
+                  || get_piece b (l - 1, c)
+                     <> Some { shape = Pawn false; color = White }
+                then raise Invalid_fen
+                else
+                  {
+                    b with
+                    last_move = Some (Movement ((l + 1, c), (l - 1, c)));
+                  }
+              else if
+                get_piece b (l - 1, c) <> None
+                || get_piece b (l, c) <> None
+                || get_piece b (l + 1, c)
+                   <> Some { shape = Pawn false; color = Black }
+              then raise Invalid_fen
+              else
+                { b with last_move = Some (Movement ((l - 1, c), (l + 1, c))) })
   | _ -> raise Invalid_fen
-
-let init_board () =
-  fen_to_board "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
 let pp_board fmt b =
   let () =

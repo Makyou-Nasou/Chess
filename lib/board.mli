@@ -8,10 +8,13 @@ type board_status =
   | Draw_board of board
   | Error_board of string
 
+exception Invalid_fen
 exception No_King
 
-(*Method that initializes a board with black at the top, white at the bottom.*)
-val init_board : unit -> board
+(*Method that initializes a board with FEN.
+   Only check if there is only one king of each color and that the dimensions of the tray are correct! (raise invalid_fen in case of error)
+    If a given configuration is never feasible, it is considered the fault of the person who fived the FEN.*)
+val generate_board_with_fen : string -> board
 
 (*Method to display the board in a terminal. With the pieces that were removed from the game. As well as the one still in play.*)
 val pp_board : Format.formatter -> board -> unit
